@@ -428,7 +428,6 @@ function aggregateIpcc(emissions) {
     .sort((a, b) => b.total - a.total);
 
   return {
-    total: totalIpcc,
     total_ipcc: totalIpcc,
     total_extended: totalExtended,
     sectors
@@ -496,11 +495,15 @@ app.get("/api/ipcc/inventory", async (req, res) => {
   const name = normalizeCityName(req.query.name);
   const year = Number(req.query.year);
   const gas = mapGasParam(req.query.gas);
+  const inventoryMode = String(req.query.inventory_mode || "extended").toLowerCase();
 
   if (!name || !level) return res.status(400).json({ error: "Missing parameters" });
   if (!Number.isFinite(year)) return res.status(400).json({ error: "Invalid year" });
   if (!["province", "department"].includes(level)) {
     return res.status(400).json({ error: "Invalid level" });
+  }
+  if (!["ipcc", "extended"].includes(inventoryMode)) {
+    return res.status(400).json({ error: "Invalid inventory_mode" });
   }
 
   try {
@@ -508,7 +511,24 @@ app.get("/api/ipcc/inventory", async (req, res) => {
     const admin = await searchAdmin(name, adminLevel, 10);
     const data = await fetchEmissions({ adminId: admin.id, years: String(year), gas });
     const emissions = (data && (data.all || data.All)) || [];
-    const { total, total_ipcc, total_extended, sectors } = aggregateIpcc(emissions);
+    const { total_ipcc, total_extended, sectors } = aggregateIpcc(emissions);
+    const activeTotal = inventoryMode === "extended" ? total_extended : total_ipcc;
+
+    const outputSectors = sectors.map((sector) => {
+      const nextSector = {
+        ...sector,
+        share: activeTotal > 0 ? sector.total / activeTotal : 0
+      };
+
+      if (sector.subsectors) {
+        nextSector.subsectors = sector.subsectors.map((sub) => ({
+          ...sub,
+          share: sector.total > 0 ? sub.total / sector.total : 0
+        }));
+      }
+
+      return nextSector;
+    });
 
     logUnmappedSectors();
 
@@ -521,17 +541,18 @@ app.get("/api/ipcc/inventory", async (req, res) => {
       },
       year,
       unit: "tCO2e",
-      total,
+      total: activeTotal,
       total_ipcc,
       total_extended,
-      sectors,
+      sectors: outputSectors,
       metadata: {
         source: "Climate TRACE v6",
         gwp: "AR6 100yr",
-        inventory_mode: "extended",
+        inventory_mode: inventoryMode,
+        totals_available: ["ipcc", "extended"],
         totals_definition: {
-          total_ipcc: "Excludes international aviation and shipping (IPCC rule)",
-          total_extended: "Includes all observed emissions within the territory"
+          ipcc: "Excludes international aviation and shipping",
+          extended: "Includes all observed emissions"
         },
         generated_at: new Date().toISOString()
       }
