@@ -17,6 +17,10 @@ const IPCC_SECTORS = {
 };
 
 const UNMAPPED_SECTORS = new Set();
+const ARG_PROVINCES_CACHE = {
+  ts: 0,
+  items: []
+};
 
 const IPCC_METADATA = {
   "1": {
@@ -267,6 +271,14 @@ function normalizeCityName(name) {
   return String(name || "").trim();
 }
 
+function normalizeNameForMatch(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 function isArgentinaAdminLevel2(item) {
   if (!item || item.Gid0 !== "ARG") return false;
   const name = normalizeCityName(item.Name);
@@ -309,6 +321,31 @@ async function fetchAdminById(adminId) {
     gid1: props.gid1 || null,
     bbox: geometry ? computeBboxFromGeometry(geometry) : null
   };
+}
+
+async function listArgentinaProvinces() {
+  const now = Date.now();
+  if (ARG_PROVINCES_CACHE.items.length > 0 && now - ARG_PROVINCES_CACHE.ts < 6 * 60 * 60 * 1000) {
+    return ARG_PROVINCES_CACHE.items;
+  }
+
+  const argentina = await fetchAdminById("ARG");
+  if (!argentina?.bbox) return [];
+
+  const items = await fetchAdminSearch({
+    name: "",
+    level: 1,
+    limit: 300,
+    bbox: argentina.bbox
+  });
+
+  const provinces = (Array.isArray(items) ? items : []).filter(
+    (item) => item?.Gid0 === "ARG" && Number(item?.Level) === 1
+  );
+
+  ARG_PROVINCES_CACHE.items = provinces;
+  ARG_PROVINCES_CACHE.ts = now;
+  return provinces;
 }
 
 function computeBboxFromGeometry(geometry) {
@@ -519,6 +556,13 @@ app.get("/api/ipcc/search", async (req, res) => {
         (item) => item?.Gid0 === "ARG" && Number(item?.Level) === 1
       );
     }
+    if (level === 1 && Array.isArray(items) && items.length === 0 && q.length >= 2) {
+      const target = normalizeNameForMatch(q);
+      const provinces = await listArgentinaProvinces();
+      items = provinces.filter((item) =>
+        normalizeNameForMatch(item?.Name).includes(target)
+      );
+    }
     const suggestions = [];
     const seen = new Set();
 
@@ -546,7 +590,14 @@ app.get("/api/ipcc/departments", async (req, res) => {
 
   try {
     const provinceItems = await fetchAdminSearch({ name: province, level: 1, limit: 20 });
-    const provinceCandidate = pickAdminCandidate(provinceItems);
+    let provinceCandidate = pickAdminCandidate(provinceItems);
+    if (!provinceCandidate && province.length >= 2) {
+      const target = normalizeNameForMatch(province);
+      const provinces = await listArgentinaProvinces();
+      provinceCandidate = provinces.find(
+        (item) => normalizeNameForMatch(item?.Name) === target
+      );
+    }
     const provinceId = provinceCandidate?.Id || provinceCandidate?.id;
     if (!provinceId) return res.json([]);
 
