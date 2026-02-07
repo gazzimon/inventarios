@@ -16,6 +16,8 @@ const IPCC_SECTORS = {
   "X": "Other"
 };
 
+const UNMAPPED_SECTORS = new Set();
+
 const IPCC_METADATA = {
   "1": {
     name: "Energy",
@@ -47,12 +49,14 @@ const IPCC_SUBSECTORS = {
   "2B": "Chemical Industry",
   "2C": "Metal Industry",
   "2D": "Other Manufacturing",
+  "2F": "Ozone Depleting Substances",
   "3A": "Livestock",
   "3B": "Cropland",
   "3C": "Fires and Land Use Change",
   "3D": "Other AFOLU",
   "4A": "Solid Waste",
-  "4B": "Wastewater"
+  "4B": "Wastewater",
+  "4C": "Incineration and Open Burning of Waste"
 };
 
 const IPCC_HIERARCHY = {
@@ -119,6 +123,9 @@ const IPCC_MAPPING = [
   { match: "rail", sector: "1", subsector: "1B" },
   { match: "domestic-aviation", sector: "1", subsector: "1B" },
   { match: "domestic-shipping", sector: "1", subsector: "1B" },
+  { match: "international-aviation", sector: "1", subsector: "1B" },
+  { match: "international-shipping", sector: "1", subsector: "1B" },
+  { match: "other-energy-use", sector: "1", subsector: "1A" },
 
   // 1B – Fugitive emissions
   { match: "oil-and-gas-production", sector: "1", subsector: "1C" },
@@ -137,6 +144,7 @@ const IPCC_MAPPING = [
   // 2B – Chemical Industry
   { match: "chemical", sector: "2", subsector: "2B" },
   { match: "petrochemical", sector: "2", subsector: "2B" },
+  { match: "fluorinated-gases", sector: "2", subsector: "2F" },
 
   // 2C – Metal Industry
   { match: "iron", sector: "2", subsector: "2C" },
@@ -164,12 +172,15 @@ const IPCC_MAPPING = [
   { match: "synthetic-fertilizer", sector: "3", subsector: "3B" },
   { match: "crop-residues", sector: "3", subsector: "3B" },
   { match: "manure-applied-to-soils", sector: "3", subsector: "3B" },
+  { match: "other-agricultural-soil-emissions", sector: "3", subsector: "3D" },
 
   // 3C – Forest & fires
   { match: "forest-land", sector: "3", subsector: "3C" },
   { match: "cropland-fires", sector: "3", subsector: "3C" },
   { match: "shrubgrass-fires", sector: "3", subsector: "3C" },
   { match: "wetland-fires", sector: "3", subsector: "3C" },
+  { match: "forest-land-clearing", sector: "3", subsector: "3B" },
+  { match: "forest-land-degradation", sector: "3", subsector: "3B" },
 
   // 3D – Other AFOLU
   { match: "water-reservoirs", sector: "3", subsector: "3D" },
@@ -180,7 +191,8 @@ const IPCC_MAPPING = [
 
   { match: "solid-waste-disposal", sector: "4", subsector: "4A" },
   { match: "wastewater", sector: "4", subsector: "4B" },
-  { match: "incineration-and-open-burning-of-waste", sector: "4", subsector: "4C" }
+  { match: "incineration-and-open-burning-of-waste", sector: "4", subsector: "4C" },
+  { match: "industrial-wastewater", sector: "4", subsector: "4B" }
 ];
 
 
@@ -281,6 +293,19 @@ function mapGasParam(gas) {
   return String(gas);
 }
 
+function resolveIpccFlags(sectorRaw, isResidualCategory = false) {
+  const value = String(sectorRaw || "").toLowerCase();
+  const isInternationalBunker =
+    value.includes("international-aviation") ||
+    value.includes("international-shipping");
+
+  return {
+    included_in_total: !isInternationalBunker,
+    is_international_bunker: isInternationalBunker,
+    is_residual_category: Boolean(isResidualCategory)
+  };
+}
+
 function mapSectorToIpcc(sectorRaw) {
   const value = String(sectorRaw || "").toLowerCase();
 
@@ -311,6 +336,9 @@ function mapSectorToIpccHierarchical(sectorRaw) {
 
   // fallback al mapping plano actual
   const basic = mapSectorToIpcc(sectorRaw);
+  if (!basic.subsectorCode) {
+    UNMAPPED_SECTORS.add(value);
+  }
 
   return {
     sector: basic.sectorCode,
@@ -331,6 +359,8 @@ function aggregateIpcc(emissions) {
     if (!Number.isFinite(value) || value <= 0) return;
 
     const ipcc = mapSectorToIpccHierarchical(item?.Sector);
+    const isResidualCategory = !ipcc.code;
+    const ipccFlags = resolveIpccFlags(item?.Sector, isResidualCategory);
     const sectorKey = ipcc.sector;
     const sectorName = IPCC_SECTORS[ipcc.sector] || "Other";
 
@@ -346,17 +376,19 @@ function aggregateIpcc(emissions) {
     const sector = totals.get(sectorKey);
     sector.total += value;
 
-    if (ipcc.code) {
-      if (!sector.subsectors.has(ipcc.code)) {
-        sector.subsectors.set(ipcc.code, {
-          ipcc_code: ipcc.code,
-          parent_ipcc: ipcc.group || ipcc.parent || null,
-          name: ipcc.name || IPCC_SUBSECTORS[ipcc.code] || "Other",
-          total: 0
-        });
-      }
-      sector.subsectors.get(ipcc.code).total += value;
+    const subsectorKey = ipcc.code || "X";
+    if (!sector.subsectors.has(subsectorKey)) {
+      sector.subsectors.set(subsectorKey, {
+        sector_ipcc: ipcc.sector,
+        parent_ipcc: ipcc.parent || null,
+        group_ipcc: ipcc.group || null,
+        ipcc_code: subsectorKey,
+        name: ipcc.name || IPCC_SUBSECTORS[ipcc.code] || "Other",
+        total: 0,
+        ipcc_flags: ipccFlags
+      });
     }
+    sector.subsectors.get(subsectorKey).total += value;
 
     grandTotal += value;
   });
@@ -456,6 +488,10 @@ app.get("/api/ipcc/inventory", async (req, res) => {
     const data = await fetchEmissions({ adminId: admin.id, years: String(year), gas });
     const emissions = (data && (data.all || data.All)) || [];
     const { total, sectors } = aggregateIpcc(emissions);
+
+    if (UNMAPPED_SECTORS.size > 0) {
+      console.warn("⚠️ Unmapped Climate TRACE sectors:", [...UNMAPPED_SECTORS]);
+    }
 
     res.json({
       admin: {
