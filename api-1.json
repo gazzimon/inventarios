@@ -1,0 +1,1656 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "version": "6.8.2",
+    "description": "Climate TRACE API v6",
+    "contact": {
+      "url": "https://climatetrace.org/contact"
+    },
+    "title": "Climate TRACE API v6"
+  },
+  "servers": [
+    {
+      "description": "Public",
+      "url": "https://api.climatetrace.org"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Sources",
+      "description": "Retrieve data on emissions sources"
+    },
+    {
+      "name": "Countries",
+      "description": "Retrieve data on country emissions"
+    },
+    {
+      "name": "Administrative Areas",
+      "description": "Find and get details on administrative areas"
+    },
+    {
+      "name": "Definitions",
+      "description": "Retrieve definitions"
+    }
+  ],
+  "paths": {
+    "/v6/assets": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "Search emissions sources",
+        "description": "Returns a JSON list of sources matching the search parameters, along with the centroid of each source location.",
+        "operationId": "get-assets",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/year"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/countries_csv_optional"
+          },
+          {
+            "$ref": "#/components/parameters/sectors_csv_optional"
+          },
+          {
+            "$ref": "#/components/parameters/subsectors_csv_optional"
+          },
+          {
+            "$ref": "#/components/parameters/continents_csv_optional"
+          },
+          {
+            "$ref": "#/components/parameters/groups_csv_optional"
+          },
+          {
+            "$ref": "#/components/parameters/admin_id_optional"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of Sources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetCollection"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          }
+        }
+      }
+    },
+    "/v6/assets/{sourceId}": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "Details on a single emissions source",
+        "description": "Detail on a single emissions source, including ownership information",
+        "operationId": "get-asset-by-id",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "description": "The id of the source",
+            "in": "path",
+            "required": true,
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of Sources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetCollection"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          }
+        }
+      }
+    },
+    "/v6/assets/emissions": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "Filter and summarize source emissions",
+        "description": "Emissions from the sources defined by the group of filters provided. The emissions are grouped by country or continent, with country taking precendence",
+        "operationId": "get-asset-emissions",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/admin_id_optional"
+          },
+          {
+            "$ref": "#/components/parameters/years_csv"
+          },
+          {
+            "$ref": "#/components/parameters/subsectors_csv_optional"
+          },
+          {
+            "$ref": "#/components/parameters/sectors_csv_optional"
+          },
+          {
+            "$ref": "#/components/parameters/continents_csv_optional"
+          },
+          {
+            "$ref": "#/components/parameters/groups_csv_optional"
+          },
+          {
+            "$ref": "#/components/parameters/countries_csv_optional"
+          },
+          {
+            "$ref": "#/components/parameters/gas"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Summary of emissions for the parameters provided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "AssetCount": {
+                        "type": "integer"
+                      },
+                      "Emissions": {
+                        "type": "number"
+                      },
+                      "Gas": {
+                        "$ref": "#/components/schemas/Gas"
+                      },
+                      "Country": {
+                        "$ref": "#/components/schemas/Country"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          }
+        }
+      }
+    },
+    "/v6/country/emissions": {
+      "get": {
+        "tags": [
+          "Countries"
+        ],
+        "summary": "Emissions summarized by country",
+        "description": "Returns emissions aggregated by country for a given list of sectors or subsectors. Either the sectors or subsectors parameter is required - sectors take precedence",
+        "operationId": "get-emissions",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/since"
+          },
+          {
+            "$ref": "#/components/parameters/to"
+          },
+          {
+            "$ref": "#/components/parameters/sector_optional"
+          },
+          {
+            "$ref": "#/components/parameters/subsector_optional"
+          },
+          {
+            "$ref": "#/components/parameters/continents_csv_optional"
+          },
+          {
+            "$ref": "#/components/parameters/groups_csv_optional"
+          },
+          {
+            "$ref": "#/components/parameters/countries_csv_optional"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Emissions grouped by country",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CountryAggregatedEmission"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          }
+        }
+      }
+    },
+    "/v6/admins/search": {
+      "get": {
+        "tags": [
+          "Administrative Areas"
+        ],
+        "operationId": "search-admins",
+        "summary": "Search for administrative areas",
+        "description": "Returns a list of administrative areas matching the given parameters",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/point_optional"
+          },
+          {
+            "$ref": "#/components/parameters/bbox_optional"
+          },
+          {
+            "name": "name",
+            "description": "A name (or fragment) of the administrative area",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 50
+            }
+          },
+          {
+            "name": "level",
+            "description": "The GADM level: 0 indicates country, 1 indicates province, 2 indicates county",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemDefinitions"
+                }
+              }
+            },
+            "description": "List of administrative areas"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        }
+      }
+    },
+    "/v6/admins/{adminId}/geojson": {
+      "get": {
+        "tags": [
+          "Administrative Areas"
+        ],
+        "operationId": "get-admin-geojson",
+        "summary": "Get admininstrative area GeoJSON",
+        "description": "Returns an administrative area in GeoJSON",
+        "parameters": [
+          {
+            "name": "adminId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feature"
+                }
+              }
+            },
+            "description": "The administrative area encoded as a GeoJSON feature"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        }
+      }
+    },
+    "/v6/definitions/sectors": {
+      "get": {
+        "tags": [
+          "Definitions"
+        ],
+        "summary": "Sector definitions",
+        "description": "",
+        "operationId": "get-sectors",
+        "responses": {
+          "200": {
+            "description": "List of sector names and ids",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v6/definitions/subsectors": {
+      "get": {
+        "tags": [
+          "Definitions"
+        ],
+        "summary": "Subsectors defitions",
+        "description": "",
+        "operationId": "get-subsectors",
+        "responses": {
+          "200": {
+            "description": "List of subsector names and ids",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v6/definitions/countries": {
+      "get": {
+        "tags": [
+          "Definitions"
+        ],
+        "summary": "Countries defintions",
+        "description": "",
+        "operationId": "get-countries",
+        "responses": {
+          "200": {
+            "description": "List of country codes and names",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "Name": {
+                      "type": "string"
+                    },
+                    "Code": {
+                      "type": "string",
+                      "maxLength": 3
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v6/definitions/groups": {
+      "get": {
+        "tags": [
+          "Definitions"
+        ],
+        "summary": "Country group definitions",
+        "description": "Defines entities like the EU, G77, etc.",
+        "operationId": "get-groups",
+        "responses": {
+          "200": {
+            "description": "List of countries belonging to given group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v6/definitions/continents": {
+      "get": {
+        "tags": [
+          "Definitions"
+        ],
+        "summary": "Continents definitions",
+        "description": "",
+        "operationId": "get-continents",
+        "responses": {
+          "200": {
+            "description": "List of continents and the countries in each",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v6/definitions/gases": {
+      "get": {
+        "tags": [
+          "Definitions"
+        ],
+        "summary": "Gases definitions",
+        "description": "",
+        "operationId": "get-gases",
+        "responses": {
+          "200": {
+            "description": "List of gases",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "400": {
+        "description": "Bad Request",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "Not Found",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "group_path": {
+        "name": "group",
+        "in": "path",
+        "description": "the name of the group",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "top500"
+          ]
+        }
+      },
+      "offset": {
+        "name": "offset",
+        "in": "query",
+        "description": "For pagination, an offset from the start of the sequence of items",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 0
+        }
+      },
+      "limit": {
+        "name": "limit",
+        "in": "query",
+        "description": "The maximum number of items to return",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "default": 100
+        }
+      },
+      "country_path": {
+        "name": "country",
+        "in": "path",
+        "description": "The 3 letter code specifying the country",
+        "required": true,
+        "style": "simple",
+        "explode": false,
+        "schema": {
+          "$ref": "#/components/schemas/Country"
+        }
+      },
+      "country": {
+        "name": "country",
+        "in": "query",
+        "description": "The 3 letter code specifying the country",
+        "required": true,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "$ref": "#/components/schemas/Country"
+        }
+      },
+      "country_optional": {
+        "name": "country",
+        "in": "query",
+        "description": "The 3 letter code specifying the country",
+        "required": false,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "$ref": "#/components/schemas/Country"
+        }
+      },
+      "countries_csv": {
+        "name": "countries",
+        "in": "query",
+        "description": "A comma separated list of 3 letter code specifying the countries. A list of supported countries is available from the /definitions/countries endpoint",
+        "required": true,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Country"
+          }
+        }
+      },
+      "countries_csv_optional": {
+        "name": "countries",
+        "in": "query",
+        "description": "A comma separated list of 3 letter code specifying the countries. A list of supported countries is available from the /definitions/countries endpoint",
+        "required": false,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Country"
+          }
+        }
+      },
+      "continent_path": {
+        "name": "continent",
+        "in": "path",
+        "description": "The continent name",
+        "required": true,
+        "style": "simple",
+        "explode": false,
+        "schema": {
+          "$ref": "#/components/schemas/Continent"
+        }
+      },
+      "continent": {
+        "name": "continent",
+        "in": "query",
+        "description": "The continent name",
+        "required": true,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "$ref": "#/components/schemas/Continent"
+        }
+      },
+      "continent_optional": {
+        "name": "continent",
+        "in": "query",
+        "description": "The continent name",
+        "required": false,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "$ref": "#/components/schemas/Continent"
+        }
+      },
+      "continents_csv": {
+        "name": "continents",
+        "in": "query",
+        "description": "A comma separated list of continents",
+        "required": true,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Continent"
+          }
+        }
+      },
+      "groups_csv_optional": {
+        "name": "groups",
+        "in": "query",
+        "description": "A comma separated list of groups, available at /definitions/groups",
+        "required": false,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "continents_csv_optional": {
+        "name": "continents",
+        "in": "query",
+        "description": "A comma separated list of continents",
+        "required": false,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Continent"
+          }
+        }
+      },
+      "admin_id_optional": {
+        "name": "adminId",
+        "in": "query",
+        "description": "the id of an administrative area",
+        "required": false,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "admin_id": {
+        "name": "id",
+        "in": "path",
+        "description": "the id of an administrative area",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "owner_id": {
+        "name": "id",
+        "in": "path",
+        "description": "the id of the owner",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "since": {
+        "name": "since",
+        "in": "query",
+        "description": "The start year (inclusive). Must be less than 'to' parameter",
+        "required": false,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "maximum": 2050,
+          "minimum": 2000,
+          "type": "integer",
+          "default": 2010
+        }
+      },
+      "to": {
+        "name": "to",
+        "in": "query",
+        "description": "The end year (inclusive). Must be larger than 'since' parameter",
+        "required": false,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "maximum": 2050,
+          "minimum": 2000,
+          "type": "integer",
+          "default": 2020
+        }
+      },
+      "year": {
+        "name": "year",
+        "in": "query",
+        "description": "A 4 digit year",
+        "required": false,
+        "explode": true,
+        "schema": {
+          "type": "integer",
+          "default": 2022,
+          "minimum": 2020,
+          "maximum": 2050
+        }
+      },
+      "year_path": {
+        "name": "year",
+        "in": "path",
+        "description": "A 4 digit year",
+        "required": true,
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "maximum": 2050,
+            "minimum": 2020
+          }
+        }
+      },
+      "years_csv": {
+        "name": "years",
+        "in": "query",
+        "description": "A comma separated list of years to include",
+        "required": false,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "maximum": 2050,
+            "minimum": 2020,
+            "default": 2022
+          }
+        }
+      },
+      "sector": {
+        "name": "sector",
+        "in": "query",
+        "description": "The sector",
+        "required": true,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "$ref": "#/components/schemas/Sector"
+        }
+      },
+      "sector_path": {
+        "name": "sector",
+        "in": "path",
+        "description": "A sector",
+        "required": true,
+        "style": "simple",
+        "explode": false,
+        "schema": {
+          "$ref": "#/components/schemas/Sector"
+        }
+      },
+      "sector_optional": {
+        "name": "sector",
+        "in": "query",
+        "description": "A sector",
+        "required": false,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Sector"
+          }
+        }
+      },
+      "sectors_csv": {
+        "name": "sectors",
+        "in": "query",
+        "description": "A comma separated list of sectors",
+        "required": true,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Sector"
+          }
+        }
+      },
+      "sectors_csv_optional": {
+        "name": "sectors",
+        "in": "query",
+        "description": "A comma separated list of sectors",
+        "required": false,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Sector"
+          }
+        }
+      },
+      "subsectors_csv_optional": {
+        "name": "subsectors",
+        "in": "query",
+        "description": "A comma separated list of subsectors",
+        "required": false,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "$ref": "#/components/schemas/Subsector"
+        }
+      },
+      "subsector_optional": {
+        "name": "subsectors",
+        "in": "query",
+        "description": "A subsector",
+        "required": false,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "$ref": "#/components/schemas/Subsector"
+        }
+      },
+      "subsector_path": {
+        "name": "subsector",
+        "in": "path",
+        "description": "A subsector",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/Subsector"
+        }
+      },
+      "gas": {
+        "name": "gas",
+        "in": "query",
+        "schema": {
+          "$ref": "#/components/schemas/Gas"
+        }
+      },
+      "z": {
+        "name": "z",
+        "in": "path",
+        "description": "the zoom value",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "maximum": 16,
+          "minimum": 0
+        }
+      },
+      "x": {
+        "name": "x",
+        "in": "path",
+        "description": "the x value",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 70000
+        }
+      },
+      "y": {
+        "name": "y",
+        "in": "path",
+        "description": "the y value",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 70000
+        }
+      },
+      "bbox_optional": {
+        "description": "a bounding box according to RFC7946 https://datatracker.ietf.org/doc/html/rfc7946#section-5",
+        "required": false,
+        "name": "bbox",
+        "style": "deepObject",
+        "in": "query",
+        "example": "-10.0,-10.0,10.0,10.0",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "maxItems": 4,
+            "minItems": 4
+          }
+        }
+      },
+      "point_optional": {
+        "description": "a WGS84 Point in the form of longitude, latitude according to RFC1946",
+        "required": false,
+        "name": "point",
+        "in": "query",
+        "style": "deepObject",
+        "example": "-76.3456600772524,39.53580321794458",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "maxItems": 2,
+            "minItems": 2
+          }
+        }
+      }
+    },
+    "schemas": {
+      "TileJSON": {
+        "$ref": "https://raw.githubusercontent.com/mapbox/tilejson-spec/master/3.0.0/schema.json"
+      },
+      "FeatureCollection": {
+        "$ref": "https://geojson.org/schema/FeatureCollection.json"
+      },
+      "Feature": {
+        "$ref": "https://geojson.org/schema/Feature.json"
+      },
+      "Problem": {
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "A URI reference [RFC3986] that identifies the problem type.",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "description": "A short, human-readable summary of the problem type."
+          },
+          "status": {
+            "type": "number",
+            "description": "The HTTP status code ([RFC7231], Section 6) generated by the origin server for this occurrence of the problem."
+          },
+          "instance": {
+            "type": "string",
+            "description": "A URI reference that identifies the specific occurrence of the problem."
+          },
+          "detail": {
+            "type": "string",
+            "description": "A human-readable explanation specific to this occurrence of the problem."
+          },
+          "debugging": {
+            "type": "string",
+            "description": "Debugging information for DEV and QA environments."
+          },
+          "invalid-params": {
+            "uniqueItems": true,
+            "type": "array",
+            "description": "An array of validation errors.",
+            "items": {
+              "$ref": "#/components/schemas/ProblemParams"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProblemParams": {
+        "additionalProperties": false,
+        "description": "The validation error descriptor.",
+        "example": null,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "CountryEmissions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "Country": {
+              "$ref": "#/components/schemas/Country"
+            },
+            "Emissions": {
+              "type": "number"
+            },
+            "Year": {
+              "type": "number"
+            },
+            "Gas": {
+              "$ref": "#/components/schemas/Gas"
+            },
+            "Sector": {
+              "$ref": "#/components/schemas/Sector"
+            }
+          }
+        }
+      },
+      "ContinentEmissions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "Continent": {
+              "$ref": "#/components/schemas/Continent"
+            },
+            "Emissions": {
+              "type": "number"
+            },
+            "Year": {
+              "type": "number"
+            },
+            "Gas": {
+              "$ref": "#/components/schemas/Gas"
+            },
+            "Sector": {
+              "$ref": "#/components/schemas/Sector"
+            }
+          }
+        }
+      },
+      "GlobalEmissions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "Emissions": {
+              "type": "number"
+            },
+            "Year": {
+              "type": "number"
+            },
+            "Gas": {
+              "$ref": "#/components/schemas/Gas"
+            },
+            "Sector": {
+              "$ref": "#/components/schemas/Sector"
+            }
+          }
+        }
+      },
+      "TimeSeriesEmission": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": false
+          },
+          "emissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BaseEmission"
+            }
+          }
+        }
+      },
+      "BaseEmission": {
+        "required": [
+          "n2o",
+          "co2e",
+          "co2",
+          "ch4",
+          "co2e_20yr",
+          "co2e_100yr",
+          "year"
+        ],
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "nullable": false
+          }
+        }
+      },
+      "CountryAggregatedEmission": {
+        "type": "object",
+        "properties": {
+          "Country": {
+            "$ref": "#/components/schemas/Country"
+          },
+          "Continent": {
+            "$ref": "#/components/schemas/Continent"
+          },
+          "Rank": {
+            "type": "integer",
+            "nullable": true
+          },
+          "PreviousRank": {
+            "type": "integer",
+            "nullable": true
+          },
+          "Emissions": {
+            "$ref": "#/components/schemas/SimpleGasEmissions"
+          },
+          "WorldEmissions": {
+            "$ref": "#/components/schemas/SimpleGasEmissions"
+          }
+        }
+      },
+      "SimpleGasEmissions": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/SimpleGasEmission"
+        }
+      },
+      "SimpleGasEmission": {
+        "type": "object",
+        "properties": {
+          "gas": {
+            "$ref": "#/components/schemas/Gas"
+          },
+          "value": {
+            "type": "number"
+          }
+        }
+      },
+      "DataAvailabilities": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/DataAvailability"
+        }
+      },
+      "DataAvailability": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "availability": {
+            "type": "object",
+            "properties": {
+              "co2e": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "ch4": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "n2o": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "co2e_20yr": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "co2e_100yr": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Country": {
+        "type": "string",
+        "enum": [
+          "ANT",
+          "SCG",
+          "ABW",
+          "AFG",
+          "AGO",
+          "AIA",
+          "ALA",
+          "ALB",
+          "AND",
+          "ARE",
+          "ARG",
+          "ARM",
+          "ASM",
+          "ATA",
+          "ATF",
+          "ATG",
+          "AUS",
+          "AUT",
+          "AZE",
+          "BDI",
+          "BEL",
+          "BEN",
+          "BES",
+          "BFA",
+          "BGD",
+          "BGR",
+          "BHR",
+          "BHS",
+          "BIH",
+          "BLM",
+          "BLR",
+          "BLZ",
+          "BMU",
+          "BOL",
+          "BRA",
+          "BRB",
+          "BRN",
+          "BTN",
+          "BVT",
+          "BWA",
+          "CAF",
+          "CAN",
+          "CCK",
+          "CHE",
+          "CHL",
+          "CHN",
+          "CIV",
+          "CMR",
+          "COD",
+          "COG",
+          "COK",
+          "COL",
+          "COM",
+          "CPV",
+          "CRI",
+          "CUB",
+          "CUW",
+          "CXR",
+          "CYM",
+          "CYP",
+          "CZE",
+          "DEU",
+          "DJI",
+          "DMA",
+          "DNK",
+          "DOM",
+          "DZA",
+          "ECU",
+          "EGY",
+          "ERI",
+          "ESH",
+          "ESP",
+          "EST",
+          "ETH",
+          "FIN",
+          "FJI",
+          "FLK",
+          "FRA",
+          "FRO",
+          "FSM",
+          "GAB",
+          "GBR",
+          "GEO",
+          "GGY",
+          "GHA",
+          "GIB",
+          "GIN",
+          "GLP",
+          "GMB",
+          "GNB",
+          "GNQ",
+          "GRC",
+          "GRD",
+          "GRL",
+          "GTM",
+          "GUF",
+          "GUM",
+          "GUY",
+          "HKG",
+          "HMD",
+          "HND",
+          "HRV",
+          "HTI",
+          "HUN",
+          "IDN",
+          "IMN",
+          "IND",
+          "IOT",
+          "IRL",
+          "IRN",
+          "IRQ",
+          "ISL",
+          "ISR",
+          "ITA",
+          "JAM",
+          "JEY",
+          "JOR",
+          "JPN",
+          "KAZ",
+          "KEN",
+          "KGZ",
+          "KHM",
+          "KIR",
+          "KNA",
+          "KOR",
+          "XKX",
+          "KWT",
+          "LAO",
+          "LBN",
+          "LBR",
+          "LBY",
+          "LCA",
+          "LIE",
+          "LKA",
+          "LSO",
+          "LTU",
+          "LUX",
+          "LVA",
+          "MAC",
+          "MAF",
+          "MAR",
+          "MCO",
+          "MDA",
+          "MDG",
+          "MDV",
+          "MEX",
+          "MHL",
+          "MKD",
+          "MLI",
+          "MLT",
+          "MMR",
+          "MNE",
+          "MNG",
+          "MNP",
+          "MOZ",
+          "MRT",
+          "MSR",
+          "MTQ",
+          "MUS",
+          "MWI",
+          "MYS",
+          "MYT",
+          "NAM",
+          "NCL",
+          "NER",
+          "NFK",
+          "NGA",
+          "NIC",
+          "NIU",
+          "NLD",
+          "NOR",
+          "NPL",
+          "NRU",
+          "NZL",
+          "OMN",
+          "PAK",
+          "PAN",
+          "PCN",
+          "PER",
+          "PHL",
+          "PLW",
+          "PNG",
+          "POL",
+          "PRI",
+          "PRK",
+          "PRT",
+          "PRY",
+          "PSE",
+          "PYF",
+          "QAT",
+          "REU",
+          "ROU",
+          "RUS",
+          "RWA",
+          "SAU",
+          "SDN",
+          "SEN",
+          "SGP",
+          "SGS",
+          "SHN",
+          "SJM",
+          "SLB",
+          "SLE",
+          "SLV",
+          "SMR",
+          "SOM",
+          "SPM",
+          "SRB",
+          "SSD",
+          "STP",
+          "SUR",
+          "SVK",
+          "SVN",
+          "SWE",
+          "SWZ",
+          "SXM",
+          "SYC",
+          "SYR",
+          "TCA",
+          "TCD",
+          "TGO",
+          "THA",
+          "TJK",
+          "TKL",
+          "TKM",
+          "TLS",
+          "TON",
+          "TTO",
+          "TUN",
+          "TUR",
+          "TUV",
+          "TWN",
+          "TZA",
+          "UGA",
+          "UKR",
+          "UMI",
+          "URY",
+          "USA",
+          "UZB",
+          "VAT",
+          "VCT",
+          "VEN",
+          "VGB",
+          "VIR",
+          "VNM",
+          "VUT",
+          "WLF",
+          "WSM",
+          "YEM",
+          "ZAF",
+          "ZMB",
+          "ZWE"
+        ]
+      },
+      "Continent": {
+        "type": "string",
+        "enum": [
+          "Asia",
+          "South America",
+          "North America",
+          "Oceania",
+          "Antarctica",
+          "Africa",
+          "Europe"
+        ]
+      },
+      "Sector": {
+        "type": "string",
+        "enum": [
+          "power",
+          "transportation",
+          "buildings",
+          "fossil-fuel-operations",
+          "manufacturing",
+          "mineral-extraction",
+          "agriculture",
+          "waste",
+          "fluorinated-gases",
+          "forestry-and-land-use"
+        ]
+      },
+      "Subsector": {
+        "enum": [
+          "electricity-generation",
+          "steel",
+          "cement",
+          "aluminum",
+          "pulp-and-paper",
+          "chemicals",
+          "domestic-shipping-ship",
+          "international-shipping-ship",
+          "domestic-shipping-port",
+          "international-shipping-port",
+          "domestic-aviation",
+          "international-aviation",
+          "road-transportation-urban-area",
+          "road-transportation-road-segment",
+          "oil-and-gas-production-and-transport-field",
+          "oil-and-gas-production-and-transport",
+          "oil-and-gas-refining",
+          "petrochemicals",
+          "coal-mining",
+          "bauxite-mining",
+          "iron-mining",
+          "copper-mining",
+          "forest-land-clearing",
+          "fores-land-degradation",
+          "forest-land-fires",
+          "shrubgrass-fires",
+          "wetland-fires",
+          "removals",
+          "net-forest-land",
+          "net-wetland",
+          "net-shrubgrass",
+          "cropland-fires",
+          "rice-cultivation",
+          "enteric-fermentation",
+          "manure-management",
+          "synthetic-fertilizer-application",
+          "solid-waste-disposal"
+        ],
+        "type": "string"
+      },
+      "Gas": {
+        "type": "string",
+        "enum": [
+          "n2o",
+          "co2e",
+          "co2",
+          "ch4",
+          "co2e_20yr",
+          "co2e_100yr"
+        ]
+      },
+      "Asset": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Feature"
+          }
+        ],
+        "properties": {
+          "emissions": {
+            "$ref": "#/components/schemas/EmissionMeasurement"
+          }
+        }
+      },
+      "AssetCollection": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/Asset"
+        }
+      },
+      "EmissionMeasurement": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "gas": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "number"
+            },
+            "factor": {
+              "type": "number"
+            },
+            "capacity": {
+              "type": "number"
+            },
+            "activity": {
+              "type": "number"
+            },
+            "activityUnits": {
+              "type": "string"
+            },
+            "emissionsFactor": {
+              "type": "string"
+            },
+            "remainder": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "gas",
+            "quantity",
+            "factor",
+            "capacity",
+            "activity",
+            "activityUnits",
+            "emissionsFactor",
+            "remainder"
+          ]
+        }
+      },
+      "ItemDefinition": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string"
+          }
+        }
+      },
+      "ItemDefinitions": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ItemDefinition"
+        }
+      }
+    }
+  }
+}
