@@ -370,7 +370,8 @@ async function fetchAdminById(adminId) {
     country: props.gid0 || "ARG",
     level: props.level ?? null,
     gid1: props.gid1 || null,
-    bbox: geometry ? computeBboxFromGeometry(geometry) : null
+    bbox: geometry ? computeBboxFromGeometry(geometry) : null,
+    geometry
   };
 }
 
@@ -484,6 +485,125 @@ function computeBboxFromGeometry(geometry) {
   walk(coords);
   if (!Number.isFinite(minX)) return null;
   return [minX, minY, maxX, maxY];
+}
+
+function isPointInRing(point, ring) {
+  const [x, y] = point;
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0];
+    const yi = ring[i][1];
+    const xj = ring[j][0];
+    const yj = ring[j][1];
+    const intersect =
+      yi > y !== yj > y &&
+      x < ((xj - xi) * (y - yi)) / (yj - yi + Number.EPSILON) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function isPointInPolygon(point, polygon) {
+  if (!Array.isArray(polygon) || polygon.length === 0) return false;
+  const outer = polygon[0];
+  if (!isPointInRing(point, outer)) return false;
+  for (let i = 1; i < polygon.length; i += 1) {
+    if (isPointInRing(point, polygon[i])) return false;
+  }
+  return true;
+}
+
+function isPointInGeometry(point, geometry) {
+  if (!geometry) return false;
+  if (geometry.type === "Polygon") {
+    return isPointInPolygon(point, geometry.coordinates);
+  }
+  if (geometry.type === "MultiPolygon") {
+    return geometry.coordinates.some((polygon) => isPointInPolygon(point, polygon));
+  }
+  return false;
+}
+
+async function fetchAssetsByCountry({ country, year, limit, offset }) {
+  const url = new URL(`${BASE_URL}/v6/assets`);
+  const params = new URLSearchParams({
+    countries: country,
+    year: String(year),
+    limit: String(limit),
+    offset: String(offset)
+  });
+  url.search = params;
+  return fetchJson(url);
+}
+
+// NOTE:
+// Climate TRACE /v6/assets/emissions ignores GADM-style admin IDs (ARG.14_1),
+// so we must aggregate from /v6/assets and spatially filter by admin geometry.
+async function fetchEmissionsByAdminGeometry({ adminGeometry, year, gas }) {
+  const maxPages = 60;
+  const limit = 500;
+  const maxAssets = 50000;
+  const maxMs = 25000;
+  const start = Date.now();
+
+  const sectorTotals = new Map();
+  let processed = 0;
+  let offset = 0;
+
+  let stoppedBy = null;
+
+  for (let page = 0; page < maxPages; page += 1) {
+    if (Date.now() - start > maxMs) {
+      stoppedBy = "timeout";
+      break;
+    }
+    const data = await fetchAssetsByCountry({
+      country: "ARG",
+      year,
+      limit,
+      offset
+    });
+    const assets = Array.isArray(data?.assets) ? data.assets : [];
+    if (assets.length === 0) break;
+
+    for (const asset of assets) {
+      if (processed >= maxAssets) {
+        stoppedBy = "maxAssets";
+        break;
+      }
+      const centroid = asset?.Centroid?.Geometry;
+      if (!Array.isArray(centroid) || centroid.length < 2) continue;
+      if (!isPointInGeometry(centroid, adminGeometry)) continue;
+
+      const sector = asset?.Sector || "unknown";
+      const emissions = Array.isArray(asset?.EmissionsSummary)
+        ? asset.EmissionsSummary
+        : [];
+      const record = emissions.find((item) => item?.Gas === gas);
+      const value = Number(record?.EmissionsQuantity || 0);
+      if (!Number.isFinite(value) || value <= 0) continue;
+
+      sectorTotals.set(sector, (sectorTotals.get(sector) || 0) + value);
+      processed += 1;
+    }
+
+    if (processed >= maxAssets) break;
+    if (assets.length < limit) break;
+    offset += limit;
+  }
+
+  if (stoppedBy) {
+    console.warn(
+      `⚠️ Assets aggregation truncated (${stoppedBy}). processed=${processed} year=${year}`
+    );
+  }
+
+  const emissions = Array.from(sectorTotals.entries()).map(([Sector, Emissions]) => ({
+    Sector,
+    Emissions
+  }));
+
+  return emissions;
 }
 
 function mapGasParam(gas) {
@@ -809,8 +929,17 @@ app.get("/api/ipcc/inventory", async (req, res) => {
       admin = await searchAdmin(name, adminLevel, 10);
     }
 
-    const data = await fetchEmissions({ adminId: admin.id, years: String(year), gas });
-    const emissions = (data && (data.all || data.All)) || [];
+    const adminGeo = await fetchAdminById(admin.id);
+    if (!adminGeo?.geometry) {
+      const error = new Error("Admin geometry unavailable");
+      error.status = 502;
+      throw error;
+    }
+    const emissions = await fetchEmissionsByAdminGeometry({
+      adminGeometry: adminGeo.geometry,
+      year,
+      gas
+    });
     const { total_ipcc, total_extended, sectors } = aggregateIpcc(emissions);
     const activeTotal = inventoryMode === "extended" ? total_extended : total_ipcc;
 
@@ -834,11 +963,11 @@ app.get("/api/ipcc/inventory", async (req, res) => {
 
     res.json({
       admin: {
-        id: admin.id,
-        name: admin.name,
+        id: adminGeo.id || admin.id,
+        name: adminGeo.name || admin.name,
         level,
-        country: admin.country,
-        full_name: admin.full_name || null
+        country: adminGeo.country || admin.country,
+        full_name: adminGeo.fullName || admin.full_name || null
       },
       year,
       unit: "tCO2e",
