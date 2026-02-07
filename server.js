@@ -358,7 +358,8 @@ function mapSectorToIpccHierarchical(sectorRaw) {
 
 function aggregateIpcc(emissions) {
   const totals = new Map();
-  let grandTotal = 0;
+  let totalIpcc = 0;
+  let totalExtended = 0;
 
   emissions.forEach((item) => {
     const value = Number(item?.Emissions || 0);
@@ -380,8 +381,10 @@ function aggregateIpcc(emissions) {
     }
 
     const sector = totals.get(sectorKey);
+    totalExtended += value;
     if (ipccFlags.included_in_total) {
       sector.total += value;
+      totalIpcc += value;
     }
 
     const subsectorKey = ipcc.code || "X";
@@ -398,9 +401,6 @@ function aggregateIpcc(emissions) {
     }
     sector.subsectors.get(subsectorKey).total += value;
 
-    if (ipccFlags.included_in_total) {
-      grandTotal += value;
-    }
   });
 
   const sectors = Array.from(totals.values())
@@ -417,7 +417,7 @@ function aggregateIpcc(emissions) {
         ipcc_code: sector.ipcc_code,
         name: sector.name,
         total: sector.total,
-        share: grandTotal > 0 ? sector.total / grandTotal : 0,
+        share: totalIpcc > 0 ? sector.total / totalIpcc : 0,
         tier: meta.tier || "NA",
         notes: meta.notes || null
       };
@@ -427,7 +427,12 @@ function aggregateIpcc(emissions) {
     })
     .sort((a, b) => b.total - a.total);
 
-  return { total: grandTotal, sectors };
+  return {
+    total: totalIpcc,
+    total_ipcc: totalIpcc,
+    total_extended: totalExtended,
+    sectors
+  };
 }
 
 async function searchAdmin(name, level, limit) {
@@ -503,7 +508,7 @@ app.get("/api/ipcc/inventory", async (req, res) => {
     const admin = await searchAdmin(name, adminLevel, 10);
     const data = await fetchEmissions({ adminId: admin.id, years: String(year), gas });
     const emissions = (data && (data.all || data.All)) || [];
-    const { total, sectors } = aggregateIpcc(emissions);
+    const { total, total_ipcc, total_extended, sectors } = aggregateIpcc(emissions);
 
     logUnmappedSectors();
 
@@ -517,10 +522,17 @@ app.get("/api/ipcc/inventory", async (req, res) => {
       year,
       unit: "tCO2e",
       total,
+      total_ipcc,
+      total_extended,
       sectors,
       metadata: {
         source: "Climate TRACE v6",
         gwp: "AR6 100yr",
+        inventory_mode: "extended",
+        totals_definition: {
+          total_ipcc: "Excludes international aviation and shipping (IPCC rule)",
+          total_extended: "Includes all observed emissions within the territory"
+        },
         generated_at: new Date().toISOString()
       }
     });
