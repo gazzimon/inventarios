@@ -17,6 +17,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [activeSector, setActiveSector] = useState(null)
+  const [lastQuery, setLastQuery] = useState('')
 
   const activeSectorData = useMemo(() => {
     if (!inventory?.sectors?.length || !activeSector) return null
@@ -29,15 +30,23 @@ function App() {
     setError('')
 
     try {
+      const isDepartment = Boolean(departmentId)
       const params = new URLSearchParams({
-        level: departmentId ? 'department' : 'province',
-        name: departmentId ? departmentName : provinceName,
+        level: isDepartment ? 'department' : 'province',
+        name: isDepartment ? departmentName : provinceName,
         year: String(year),
         inventory_mode: inventoryMode
       })
-      if (departmentId) params.set('admin_id', departmentId)
+      if (isDepartment) {
+        params.set('admin_id', departmentId)
+      } else if (provinceId) {
+        params.set('admin_id', provinceId)
+      }
 
-      const response = await fetch(`/api/ipcc/inventory?${params.toString()}`)
+      const queryString = `/api/ipcc/inventory?${params.toString()}`
+      setLastQuery(queryString)
+
+      const response = await fetch(queryString)
       const data = await response.json()
       if (!response.ok) {
         throw new Error(data?.error || 'Error al consultar inventario')
@@ -110,6 +119,10 @@ function App() {
         setInventoryMode={setInventoryMode}
         onSubmit={fetchInventory}
       />
+
+      {lastQuery && (
+        <div className="alert info">Consulta: {lastQuery}</div>
+      )}
 
       {loading && <div className="alert info">Cargando inventario…</div>}
       {error && <div className="alert error">{error}</div>}

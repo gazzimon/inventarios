@@ -146,6 +146,7 @@ const IPCC_MAPPING = [
   { match: "residential-onsite-fuel-usage", sector: "1", subsector: "1A" },
   { match: "non-residential-onsite-fuel-usage", sector: "1", subsector: "1A" },
   { match: "manufacturing", sector: "1", subsector: "1A" },
+  { match: "oil-and-gas-refining", sector: "1", subsector: "1A" },
 
   // 1A3 – Transport
   { match: "road-transportation", sector: "1", subsector: "1B" },
@@ -179,6 +180,8 @@ const IPCC_MAPPING = [
   { match: "iron", sector: "2", subsector: "2C" },
   { match: "steel", sector: "2", subsector: "2C" },
   { match: "aluminum", sector: "2", subsector: "2C" },
+  { match: "bauxite-mining", sector: "2", subsector: "2C" },
+  { match: "copper-mining", sector: "2", subsector: "2C" },
   { match: "other-metals", sector: "2", subsector: "2C" },
 
   // 2D – Other Manufacturing
