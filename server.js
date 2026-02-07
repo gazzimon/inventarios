@@ -16,6 +16,29 @@ const IPCC_SECTORS = {
   "X": "Other"
 };
 
+const IPCC_METADATA = {
+  "1": {
+    name: "Energy",
+    tier: "Tier 2",
+    notes: "Fuel-based estimates using proxy activity data"
+  },
+  "2": {
+    name: "IPPU",
+    tier: "Tier 1–2",
+    notes: "Process-based emissions, limited facility-level resolution"
+  },
+  "3": {
+    name: "AFOLU",
+    tier: "Tier 2–3",
+    notes: "Remote sensing + land-use models"
+  },
+  "4": {
+    name: "Waste",
+    tier: "Tier 1",
+    notes: "Population-based default factors"
+  }
+};
+
 const IPCC_SUBSECTORS = {
   "1A": "Stationary Energy",
   "1B": "Transport",
@@ -30,6 +53,51 @@ const IPCC_SUBSECTORS = {
   "3D": "Other AFOLU",
   "4A": "Solid Waste",
   "4B": "Wastewater"
+};
+
+const IPCC_HIERARCHY = {
+  "road-transportation": {
+    sector: "1",
+    parent: "1A",
+    group: "1A3",
+    code: "1A3b",
+    name: "Road Transportation"
+  },
+  "domestic-aviation": {
+    sector: "1",
+    parent: "1A",
+    group: "1A3",
+    code: "1A3a",
+    name: "Domestic Aviation"
+  },
+  "domestic-shipping": {
+    sector: "1",
+    parent: "1A",
+    group: "1A3",
+    code: "1A3d",
+    name: "Domestic Navigation"
+  },
+  "electricity-generation": {
+    sector: "1",
+    parent: "1A",
+    group: "1A1",
+    code: "1A1a",
+    name: "Electricity Generation"
+  },
+  "enteric-fermentation": {
+    sector: "3",
+    parent: "3A",
+    group: "3A1",
+    code: "3A1",
+    name: "Enteric Fermentation"
+  },
+  "forest-land-fires": {
+    sector: "3",
+    parent: "3B",
+    group: "3B2",
+    code: "3B2",
+    name: "Forest Land Fires"
+  }
 };
 /**
  * Climate TRACE → IPCC mapping
@@ -232,6 +300,27 @@ function mapSectorToIpcc(sectorRaw) {
   };
 }
 
+function mapSectorToIpccHierarchical(sectorRaw) {
+  const value = String(sectorRaw || "").toLowerCase();
+
+  for (const key in IPCC_HIERARCHY) {
+    if (value.includes(key)) {
+      return IPCC_HIERARCHY[key];
+    }
+  }
+
+  // fallback al mapping plano actual
+  const basic = mapSectorToIpcc(sectorRaw);
+
+  return {
+    sector: basic.sectorCode,
+    parent: basic.subsectorCode,
+    group: null,
+    code: basic.subsectorCode,
+    name: IPCC_SUBSECTORS[basic.subsectorCode] || "Other"
+  };
+}
+
 
 function aggregateIpcc(emissions) {
   const totals = new Map();
@@ -241,13 +330,13 @@ function aggregateIpcc(emissions) {
     const value = Number(item?.Emissions || 0);
     if (!Number.isFinite(value) || value <= 0) return;
 
-    const { sectorCode, subsectorCode } = mapSectorToIpcc(item?.Sector);
-    const sectorKey = sectorCode;
-    const sectorName = IPCC_SECTORS[sectorCode] || "Other";
+    const ipcc = mapSectorToIpccHierarchical(item?.Sector);
+    const sectorKey = ipcc.sector;
+    const sectorName = IPCC_SECTORS[ipcc.sector] || "Other";
 
     if (!totals.has(sectorKey)) {
       totals.set(sectorKey, {
-        ipcc_code: sectorCode,
+        ipcc_code: ipcc.sector,
         name: sectorName,
         total: 0,
         subsectors: new Map()
@@ -257,15 +346,16 @@ function aggregateIpcc(emissions) {
     const sector = totals.get(sectorKey);
     sector.total += value;
 
-    if (subsectorCode) {
-      if (!sector.subsectors.has(subsectorCode)) {
-        sector.subsectors.set(subsectorCode, {
-          ipcc_code: subsectorCode,
-          name: IPCC_SUBSECTORS[subsectorCode] || "Other",
+    if (ipcc.code) {
+      if (!sector.subsectors.has(ipcc.code)) {
+        sector.subsectors.set(ipcc.code, {
+          ipcc_code: ipcc.code,
+          parent_ipcc: ipcc.group || ipcc.parent || null,
+          name: ipcc.name || IPCC_SUBSECTORS[ipcc.code] || "Other",
           total: 0
         });
       }
-      sector.subsectors.get(subsectorCode).total += value;
+      sector.subsectors.get(ipcc.code).total += value;
     }
 
     grandTotal += value;
@@ -273,6 +363,7 @@ function aggregateIpcc(emissions) {
 
   const sectors = Array.from(totals.values())
     .map((sector) => {
+      const meta = IPCC_METADATA[sector.ipcc_code] || {};
       const subsectors = Array.from(sector.subsectors.values())
         .map((sub) => ({
           ...sub,
@@ -284,7 +375,9 @@ function aggregateIpcc(emissions) {
         ipcc_code: sector.ipcc_code,
         name: sector.name,
         total: sector.total,
-        share: grandTotal > 0 ? sector.total / grandTotal : 0
+        share: grandTotal > 0 ? sector.total / grandTotal : 0,
+        tier: meta.tier || "NA",
+        notes: meta.notes || null
       };
 
       if (subsectors.length > 0) output.subsectors = subsectors;
