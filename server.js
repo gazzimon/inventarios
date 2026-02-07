@@ -280,17 +280,23 @@ function isArgentinaAdminLevel2(item) {
 
 async function fetchAdminSearch({ name, level, limit }) {
   const url = new URL(`${BASE_URL}/v6/admins/search`);
-  url.search = new URLSearchParams({
-    name,
-    level: String(level),
-    limit: String(limit)
-  });
+  const params = new URLSearchParams({ name, limit: String(limit) });
+  if (level !== undefined && level !== null) {
+    params.set("level", String(level));
+  }
+  url.search = params;
   return fetchJson(url);
 }
 
 function mapGasParam(gas) {
   if (!gas || gas === "co2e") return DEFAULT_GAS;
   return String(gas);
+}
+
+function logUnmappedSectors() {
+  if (UNMAPPED_SECTORS.size > 0) {
+    console.warn("⚠️ Unmapped Climate TRACE sectors:", [...UNMAPPED_SECTORS]);
+  }
 }
 
 function resolveIpccFlags(sectorRaw, isResidualCategory = false) {
@@ -374,7 +380,9 @@ function aggregateIpcc(emissions) {
     }
 
     const sector = totals.get(sectorKey);
-    sector.total += value;
+    if (ipccFlags.included_in_total) {
+      sector.total += value;
+    }
 
     const subsectorKey = ipcc.code || "X";
     if (!sector.subsectors.has(subsectorKey)) {
@@ -390,7 +398,9 @@ function aggregateIpcc(emissions) {
     }
     sector.subsectors.get(subsectorKey).total += value;
 
-    grandTotal += value;
+    if (ipccFlags.included_in_total) {
+      grandTotal += value;
+    }
   });
 
   const sectors = Array.from(totals.values())
@@ -448,7 +458,13 @@ app.get("/api/ipcc/search", async (req, res) => {
   if (![1, 2].includes(level)) return res.status(400).json({ error: "Invalid level" });
 
   try {
-    const items = await fetchAdminSearch({ name: q, level, limit: 20 });
+    let items = await fetchAdminSearch({ name: q, level, limit: 20 });
+    if (level === 1 && Array.isArray(items) && items.length === 0) {
+      const fallback = await fetchAdminSearch({ name: q, level: null, limit: 200 });
+      items = (Array.isArray(fallback) ? fallback : []).filter(
+        (item) => item?.Gid0 === "ARG" && Number(item?.Level) === 1
+      );
+    }
     const suggestions = [];
     const seen = new Set();
 
@@ -489,9 +505,7 @@ app.get("/api/ipcc/inventory", async (req, res) => {
     const emissions = (data && (data.all || data.All)) || [];
     const { total, sectors } = aggregateIpcc(emissions);
 
-    if (UNMAPPED_SECTORS.size > 0) {
-      console.warn("⚠️ Unmapped Climate TRACE sectors:", [...UNMAPPED_SECTORS]);
-    }
+    logUnmappedSectors();
 
     res.json({
       admin: {
