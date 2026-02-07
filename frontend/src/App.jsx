@@ -33,14 +33,16 @@ function App() {
       const isDepartment = Boolean(departmentId)
       const params = new URLSearchParams({
         level: isDepartment ? 'department' : 'province',
-        name: isDepartment ? departmentName : provinceName,
         year: String(year),
         inventory_mode: inventoryMode
       })
+
       if (isDepartment) {
         params.set('admin_id', departmentId)
       } else if (provinceId) {
         params.set('admin_id', provinceId)
+      } else {
+        params.set('name', isDepartment ? departmentName : provinceName)
       }
 
       const queryString = `/api/ipcc/inventory?${params.toString()}`

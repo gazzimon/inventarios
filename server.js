@@ -503,6 +503,28 @@ function isPointInRing(point, ring) {
   return inside;
 }
 
+function isPointInBbox(point, bbox) {
+  if (!bbox || bbox.length !== 4) return false;
+  const [minX, minY, maxX, maxY] = bbox;
+  const [x, y] = point;
+  return x >= minX && x <= maxX && y >= minY && y <= maxY;
+}
+
+function normalizePointForGeometry(point, bbox) {
+  if (!Array.isArray(point) || point.length < 2) return null;
+  const normal = [Number(point[0]), Number(point[1])];
+  if (Number.isFinite(normal[0]) && Number.isFinite(normal[1])) {
+    if (!bbox || bbox.length !== 4) return normal;
+    if (isPointInBbox(normal, bbox)) return normal;
+  }
+  const swapped = [Number(point[1]), Number(point[0])];
+  if (Number.isFinite(swapped[0]) && Number.isFinite(swapped[1])) {
+    if (!bbox || bbox.length !== 4) return swapped;
+    if (isPointInBbox(swapped, bbox)) return swapped;
+  }
+  return null;
+}
+
 function isPointInPolygon(point, polygon) {
   if (!Array.isArray(polygon) || polygon.length === 0) return false;
   const outer = polygon[0];
@@ -545,6 +567,7 @@ async function fetchEmissionsByAdminGeometry({ adminGeometry, year, gas }) {
   const maxAssets = 50000;
   const maxMs = 25000;
   const start = Date.now();
+  const adminBbox = computeBboxFromGeometry(adminGeometry);
 
   const sectorTotals = new Map();
   let processed = 0;
@@ -572,8 +595,9 @@ async function fetchEmissionsByAdminGeometry({ adminGeometry, year, gas }) {
         break;
       }
       const centroid = asset?.Centroid?.Geometry;
-      if (!Array.isArray(centroid) || centroid.length < 2) continue;
-      if (!isPointInGeometry(centroid, adminGeometry)) continue;
+      const point = normalizePointForGeometry(centroid, adminBbox);
+      if (!point) continue;
+      if (!isPointInGeometry(point, adminGeometry)) continue;
 
       const sector = asset?.Sector || "unknown";
       const emissions = Array.isArray(asset?.EmissionsSummary)
