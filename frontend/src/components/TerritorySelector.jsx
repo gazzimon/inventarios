@@ -1,9 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
-
-const LEVEL_OPTIONS = [
-  { value: 'province', label: 'Provincia', apiLevel: 1 },
-  { value: 'department', label: 'Municipio / Departamento', apiLevel: 2 }
-]
+import { useEffect, useState } from 'react'
 
 const INVENTORY_OPTIONS = [
   { value: 'ipcc', label: 'Inventario IPCC' },
@@ -11,90 +6,74 @@ const INVENTORY_OPTIONS = [
 ]
 
 export default function TerritorySelector({
-  level,
-  setLevel,
-  adminName,
-  setAdminName,
-  adminId,
-  setAdminId,
+  provinceId,
+  setProvinceId,
+  provinceName,
+  setProvinceName,
+  departmentId,
+  setDepartmentId,
+  departmentName,
+  setDepartmentName,
   year,
   setYear,
   inventoryMode,
   setInventoryMode,
   onSubmit
 }) {
-  const [suggestions, setSuggestions] = useState([])
+  const [provinces, setProvinces] = useState([])
+  const [departments, setDepartments] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [showList, setShowList] = useState(false)
-  const [provinceFilter, setProvinceFilter] = useState('')
-  const [provinceLoading, setProvinceLoading] = useState(false)
-
-  const apiLevel = useMemo(() => {
-    return LEVEL_OPTIONS.find((option) => option.value === level)?.apiLevel || 1
-  }, [level])
 
   useEffect(() => {
-    const query = String(adminName || '').trim()
-    if (query.length < 2) {
-      setSuggestions([])
-      setError('')
+    let active = true
+    const load = async () => {
+      try {
+        const response = await fetch('/api/ipcc/provinces')
+        const data = await response.json()
+        if (!response.ok) throw new Error(data?.error || 'Error al cargar provincias')
+        if (active) {
+          setProvinces(Array.isArray(data) ? data : [])
+        }
+      } catch (err) {
+        if (active) setError(err.message || 'Error inesperado')
+      }
+    }
+    load()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!provinceName) {
+      setDepartments([])
       return
     }
-
-    const controller = new AbortController()
-    const handle = setTimeout(async () => {
+    let active = true
+    const load = async () => {
       setLoading(true)
       setError('')
-
       try {
         const response = await fetch(
-          `/api/ipcc/search?level=${apiLevel}&q=${encodeURIComponent(query)}`,
-          { signal: controller.signal }
+          `/api/ipcc/departments?province=${encodeURIComponent(provinceName)}`
         )
         const data = await response.json()
-        if (!response.ok) {
-          throw new Error(data?.error || 'Error en bÃºsqueda')
+        if (!response.ok) throw new Error(data?.error || 'Error al cargar departamentos')
+        if (active) {
+          setDepartments(Array.isArray(data) ? data : [])
         }
-        setSuggestions(Array.isArray(data) ? data : [])
       } catch (err) {
-        if (err.name === 'AbortError') return
-        setError(err.message || 'Error inesperado')
-        setSuggestions([])
+        if (active) setError(err.message || 'Error inesperado')
       } finally {
-        setLoading(false)
+        if (active) setLoading(false)
       }
-    }, 250)
-
+    }
+    load()
     return () => {
-      controller.abort()
-      clearTimeout(handle)
+      active = false
     }
-  }, [adminName, apiLevel])
-
-  const loadDepartmentsByProvince = async () => {
-    const query = String(provinceFilter || '').trim()
-    if (query.length < 2) return
-    setProvinceLoading(true)
-    setError('')
-
-    try {
-      const response = await fetch(
-        `/api/ipcc/departments?province=${encodeURIComponent(query)}`
-      )
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data?.error || 'Error al listar departamentos')
-      }
-      setSuggestions(Array.isArray(data) ? data : [])
-      setShowList(true)
-    } catch (err) {
-      setError(err.message || 'Error inesperado')
-      setSuggestions([])
-    } finally {
-      setProvinceLoading(false)
-    }
-  }
+  }, [provinceName])
 
   return (
     <section className="panel">
@@ -105,93 +84,48 @@ export default function TerritorySelector({
           onSubmit?.()
         }}
       >
-        <div className="field">
-          <span>Ámbito</span>
-          <div className="segmented">
-            {LEVEL_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={level === option.value ? 'active' : ''}
-                onClick={() => {
-                  setLevel(option.value)
-                  setSuggestions([])
-                  setShowList(false)
-                  setAdminId(null)
-                }}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         <label className="field">
-          <span>Nombre</span>
-          <div className="autocomplete">
-            <input
-              type="text"
-              value={adminName}
-              onChange={(event) => {
-                setAdminName(event.target.value)
-                setAdminId(null)
-                setShowList(true)
-              }}
-              onFocus={() => setShowList(true)}
-              onBlur={() => setTimeout(() => setShowList(false), 120)}
-              placeholder={level === 'province' ? 'Misiones' : 'Capital'}
-              required
-            />
-            {showList && (
-              <div className="suggestions">
-                {loading && <div className="suggestion muted">Buscando…</div>}
-                {error && <div className="suggestion error">{error}</div>}
-                {!loading && !error && suggestions.length === 0 && (
-                  <div className="suggestion muted">Sin resultados</div>
-                )}
-                {!loading &&
-                  !error &&
-                  suggestions.map((item) => (
-                    <button
-                      type="button"
-                      className="suggestion"
-                      key={item.id}
-                      onClick={() => {
-                        setAdminName(item.name)
-                        setAdminId(item.id)
-                        setShowList(false)
-                      }}
-                    >
-                      <span>{item.name}</span>
-                      <small>{item.fullName}</small>
-                    </button>
-                  ))}
-              </div>
-            )}
-          </div>
+          <span>Provincia</span>
+          <select
+            value={provinceId || ''}
+            onChange={(event) => {
+              const nextId = event.target.value
+              const selected = provinces.find((p) => p.id === nextId)
+              setProvinceId(nextId || null)
+              setProvinceName(selected?.name || '')
+              setDepartmentId(null)
+              setDepartmentName('')
+            }}
+            required
+          >
+            <option value="">Seleccionar provincia</option>
+            {provinces.map((province) => (
+              <option key={province.id} value={province.id}>
+                {province.name}
+              </option>
+            ))}
+          </select>
         </label>
 
-        {level === 'department' && (
-          <div className="field">
-            <span>Listar por provincia</span>
-            <div className="inline-actions">
-              <input
-                type="text"
-                value={provinceFilter}
-                onChange={(event) => setProvinceFilter(event.target.value)}
-                placeholder="Misiones"
-              />
-              <button
-                type="button"
-                className="secondary"
-                onClick={loadDepartmentsByProvince}
-                disabled={provinceLoading}
-              >
-                {provinceLoading ? 'Cargando…' : 'Listar'}
-              </button>
-            </div>
-          </div>
-        )}
+        <label className="field">
+          <span>Departamento (opcional)</span>
+          <select
+            value={departmentId || ''}
+            onChange={(event) => {
+              const nextId = event.target.value
+              const selected = departments.find((d) => d.id === nextId)
+              setDepartmentId(nextId || null)
+              setDepartmentName(selected?.name || '')
+            }}
+          >
+            <option value="">Total provincial</option>
+            {departments.map((department) => (
+              <option key={department.id} value={department.id}>
+                {department.name}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <label className="field">
           <span>Año</span>
@@ -221,17 +155,12 @@ export default function TerritorySelector({
           </div>
         </div>
 
-        <button className="primary" type="submit" disabled={!adminId}>
-          Consultar inventario
+        {error && <p className="helper">{error}</p>}
+
+        <button className="primary" type="submit" disabled={!provinceId || loading}>
+          {loading ? 'Cargando…' : 'Consultar inventario'}
         </button>
-        {!adminId && (
-          <p className="helper">
-            Debes seleccionar una unidad administrativa vÃ¡lida de la lista.
-          </p>
-        )}
       </form>
     </section>
   )
 }
-
-

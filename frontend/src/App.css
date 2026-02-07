@@ -104,6 +104,14 @@
   font-size: 1rem;
 }
 
+.field select {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #cbd5f5;
+  background: #f8fafc;
+  font-size: 1rem;
+}
+
 .segmented {
   display: inline-flex;
   background: #e2e8f0;
@@ -288,26 +296,6 @@
   font: inherit;
   cursor: pointer;
   text-align: left;
-}
-
-.inline-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.inline-actions input {
-  flex: 1;
-}
-
-.secondary {
-  background: #e2e8f0;
-  color: #0f172a;
-  border: none;
-  padding: 10px 14px;
-  border-radius: 10px;
-  font-weight: 600;
-  cursor: pointer;
 }
 
 .helper {

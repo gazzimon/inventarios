@@ -7,9 +7,10 @@ import SubsectorDonut from './components/SubsectorDonut.jsx'
 import TerritorySelector from './components/TerritorySelector.jsx'
 
 function App() {
-  const [level, setLevel] = useState('province')
-  const [adminName, setAdminName] = useState('Misiones')
-  const [adminId, setAdminId] = useState(null)
+  const [provinceId, setProvinceId] = useState(null)
+  const [provinceName, setProvinceName] = useState('')
+  const [departmentId, setDepartmentId] = useState(null)
+  const [departmentName, setDepartmentName] = useState('')
   const [year, setYear] = useState(2022)
   const [inventoryMode, setInventoryMode] = useState('ipcc')
   const [inventory, setInventory] = useState(null)
@@ -23,18 +24,18 @@ function App() {
   }, [inventory, activeSector])
 
   const fetchInventory = async () => {
-    if (!adminName) return
+    if (!provinceName) return
     setLoading(true)
     setError('')
 
     try {
       const params = new URLSearchParams({
-        level,
-        name: adminName,
+        level: departmentId ? 'department' : 'province',
+        name: departmentId ? departmentName : provinceName,
         year: String(year),
         inventory_mode: inventoryMode
       })
-      if (adminId) params.set('admin_id', adminId)
+      if (departmentId) params.set('admin_id', departmentId)
 
       const response = await fetch(`/api/ipcc/inventory?${params.toString()}`)
       const data = await response.json()
@@ -58,47 +59,51 @@ function App() {
           <h1>Dashboard IPCC de inventarios subnacionales</h1>
           <p className="subtitle">
             Visualiza inventarios por provincia o municipio/departamento con totales oficiales
-            IPCC y modo ampliado para anÃ¡lisis completo.
+            IPCC y modo ampliado para análisis completo.
           </p>
         </div>
         <div className="hero-card">
-          <p className="hero-label">Consulta rÃ¡pida</p>
+          <p className="hero-label">Consulta rápida</p>
           <div className="quick-actions">
             <button
               type="button"
               onClick={() => {
-                setLevel('province')
-                setAdminName('Misiones')
-                setAdminId(null)
+                setProvinceName('Misiones')
+                setProvinceId('ARG.14_1')
+                setDepartmentId(null)
+                setDepartmentName('')
                 setInventoryMode('ipcc')
                 setYear(2022)
               }}
             >
-              Misiones Â· IPCC 2022
+              Misiones · IPCC 2022
             </button>
             <button
               type="button"
               onClick={() => {
-                setLevel('department')
-                setAdminName('Capital')
-                setAdminId(null)
+                setProvinceName('Misiones')
+                setProvinceId('ARG.14_1')
+                setDepartmentId('ARG.14.4_1')
+                setDepartmentName('Capital')
                 setInventoryMode('extended')
                 setYear(2022)
               }}
             >
-              Capital Â· Ampliado 2022
+              Capital (Misiones) · Ampliado 2022
             </button>
           </div>
         </div>
       </header>
 
       <TerritorySelector
-        level={level}
-        setLevel={setLevel}
-        adminName={adminName}
-        setAdminName={setAdminName}
-        adminId={adminId}
-        setAdminId={setAdminId}
+        provinceId={provinceId}
+        setProvinceId={setProvinceId}
+        provinceName={provinceName}
+        setProvinceName={setProvinceName}
+        departmentId={departmentId}
+        setDepartmentId={setDepartmentId}
+        departmentName={departmentName}
+        setDepartmentName={setDepartmentName}
         year={year}
         setYear={setYear}
         inventoryMode={inventoryMode}
@@ -106,7 +111,7 @@ function App() {
         onSubmit={fetchInventory}
       />
 
-      {loading && <div className="alert info">Cargando inventarioâ€¦</div>}
+      {loading && <div className="alert info">Cargando inventario…</div>}
       {error && <div className="alert error">{error}</div>}
 
       {inventory && (
@@ -133,7 +138,7 @@ function App() {
                 <h3>Subsectores IPCC</h3>
                 <div className="table">
                   <div className="table-row table-head">
-                    <span>CÃ³digo</span>
+                    <span>Código</span>
                     <span>Nombre</span>
                     <span>Emisiones</span>
                     <span>Share</span>

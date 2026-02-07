@@ -320,6 +320,10 @@ function isArgentinaProvince(item) {
   return item?.Gid0 === "ARG" && Number(item?.Level) === 1;
 }
 
+function isArgentinaDepartment(item) {
+  return item?.Gid0 === "ARG" && Number(item?.Level) === 2;
+}
+
 function isArgentinaAdminLevel2(item) {
   if (!item || item.Gid0 !== "ARG") return false;
   const name = normalizeCityName(item.Name);
@@ -331,7 +335,7 @@ function isArgentinaAdminLevel2(item) {
   );
 }
 
-async function fetchAdminSearch({ name, level, limit, bbox }) {
+async function fetchAdminSearch({ name, level, limit, bbox, offset }) {
   const url = new URL(`${BASE_URL}/v6/admins/search`);
   const params = new URLSearchParams({ limit: String(limit) });
   if (name) {
@@ -339,6 +343,9 @@ async function fetchAdminSearch({ name, level, limit, bbox }) {
   }
   if (level !== undefined && level !== null) {
     params.set("level", String(level));
+  }
+  if (offset !== undefined && offset !== null) {
+    params.set("offset", String(offset));
   }
   if (Array.isArray(bbox) && bbox.length === 4) {
     params.set("bbox", bbox.join(","));
@@ -373,22 +380,81 @@ async function listArgentinaProvinces() {
   const argentina = await fetchAdminById("ARG");
   if (!argentina?.bbox) return [];
 
-  const items = await fetchAdminSearch({
-    name: "",
-    level: 1,
-    limit: 300,
-    bbox: argentina.bbox
-  });
+  const provinces = [];
+  const seen = new Set();
+  const limit = 200;
 
-  const provinces = (Array.isArray(items) ? items : []).filter(
-    (item) => item?.Gid0 === "ARG" && Number(item?.Level) === 1
-  );
+  for (let offset = 0; offset < 2000; offset += limit) {
+    const items = await fetchAdminSearch({
+      name: "",
+      level: 1,
+      limit,
+      offset,
+      bbox: argentina.bbox
+    });
+    if (!Array.isArray(items) || items.length === 0) break;
+    items.forEach((item) => {
+      if (item?.Gid0 !== "ARG" || Number(item?.Level) !== 1) return;
+      const id = item.Id || item.id;
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      provinces.push(item);
+    });
+    if (items.length < limit) break;
+  }
 
   if (provinces.length > 0) {
     ARG_PROVINCES_CACHE.items = provinces;
     ARG_PROVINCES_CACHE.ts = now;
   }
   return provinces;
+}
+
+async function listDepartmentsByProvince(province) {
+  const provinceItems = await fetchAdminSearch({ name: province, level: 1, limit: 20 });
+  let provinceCandidate = (Array.isArray(provinceItems) ? provinceItems : []).find(
+    isArgentinaProvince
+  ) || null;
+
+  if (!provinceCandidate && province.length >= 2) {
+    const target = normalizeProvinceName(province);
+    const provinces = await listArgentinaProvinces();
+    provinceCandidate = provinces.find((item) => {
+      const candidate = normalizeProvinceName(item?.Name);
+      return candidate === target || candidate.includes(target);
+    });
+  }
+
+  if (!provinceCandidate) {
+    const alias = resolveProvinceAlias(province);
+    if (alias) {
+      const aliased = await fetchAdminSearch({ name: alias, level: 1, limit: 20 });
+      provinceCandidate = (Array.isArray(aliased) ? aliased : []).find(
+        isArgentinaProvince
+      ) || null;
+    }
+  }
+
+  if (!provinceCandidate) return [];
+  const provinceId = provinceCandidate.Id || provinceCandidate.id;
+  if (!provinceId) return [];
+
+  const provinceDetails = await fetchAdminById(provinceId);
+  if (!provinceDetails?.bbox || !provinceDetails?.gid1) return [];
+
+  const items = await fetchAdminSearch({
+    name: "",
+    level: 2,
+    limit: 300,
+    bbox: provinceDetails.bbox
+  });
+
+  return (Array.isArray(items) ? items : []).filter(
+    (item) =>
+      item?.Gid0 === "ARG" &&
+      item?.Gid1 === provinceDetails.gid1 &&
+      Number(item?.Level) === 2
+  );
 }
 
 function computeBboxFromGeometry(geometry) {
@@ -587,6 +653,7 @@ async function searchAdmin(name, level, limit) {
 app.get("/api/ipcc/search", async (req, res) => {
   const q = normalizeCityName(req.query.q);
   const level = Number(req.query.level);
+  const province = normalizeCityName(req.query.province);
 
   if (q.length < 2) return res.json([]);
   if (![1, 2].includes(level)) return res.status(400).json({ error: "Invalid level" });
@@ -615,6 +682,14 @@ app.get("/api/ipcc/search", async (req, res) => {
         items = (Array.isArray(aliased) ? aliased : []).filter(isArgentinaProvince);
       }
     }
+
+    if (level === 2 && Array.isArray(items) && items.length === 0 && province) {
+      const departments = await listDepartmentsByProvince(province);
+      const target = normalizeNameForMatch(q);
+      items = departments.filter((item) =>
+        normalizeNameForMatch(item?.Name).includes(target)
+      );
+    }
     const suggestions = [];
     const seen = new Set();
 
@@ -641,49 +716,10 @@ app.get("/api/ipcc/departments", async (req, res) => {
   if (province.length < 2) return res.json([]);
 
   try {
-    const provinceItems = await fetchAdminSearch({ name: province, level: 1, limit: 20 });
-    let provinceCandidate = (Array.isArray(provinceItems) ? provinceItems : []).find(
-      isArgentinaProvince
-    ) || null;
-    if (!provinceCandidate && province.length >= 2) {
-      const target = normalizeProvinceName(province);
-      const provinces = await listArgentinaProvinces();
-      provinceCandidate = provinces.find((item) => {
-        const candidate = normalizeProvinceName(item?.Name);
-        return candidate === target || candidate.includes(target);
-      });
-    }
-    if (!provinceCandidate) {
-      const alias = resolveProvinceAlias(province);
-      if (alias) {
-        const aliased = await fetchAdminSearch({ name: alias, level: 1, limit: 20 });
-        provinceCandidate = (Array.isArray(aliased) ? aliased : []).find(
-          isArgentinaProvince
-        ) || null;
-      }
-    }
-    const provinceId = provinceCandidate?.Id || provinceCandidate?.id;
-    if (!provinceId) return res.json([]);
-
-    const provinceDetails = await fetchAdminById(provinceId);
-    if (!provinceDetails?.bbox || !provinceDetails?.gid1) return res.json([]);
-
-    const items = await fetchAdminSearch({
-      name: "",
-      level: 2,
-      limit: 300,
-      bbox: provinceDetails.bbox
-    });
-
+    const items = await listDepartmentsByProvince(province);
     const suggestions = [];
     const seen = new Set();
     (Array.isArray(items) ? items : [])
-      .filter(
-        (item) =>
-          item?.Gid0 === "ARG" &&
-          item?.Gid1 === provinceDetails.gid1 &&
-          Number(item?.Level) === 2
-      )
       .forEach((item) => {
         const id = item.Id || item.id;
         const name = normalizeCityName(item.Name);
@@ -694,6 +730,30 @@ app.get("/api/ipcc/departments", async (req, res) => {
         suggestions.push({ id, name, fullName });
       });
 
+    res.json(suggestions);
+  } catch (err) {
+    res.status(502).json({ error: "Climate TRACE API unavailable" });
+  }
+});
+
+app.get("/api/ipcc/provinces", async (req, res) => {
+  try {
+    const provinces = await listArgentinaProvinces();
+    const suggestions = [];
+    const seen = new Set();
+    (Array.isArray(provinces) ? provinces : [])
+      .filter((item) => isArgentinaProvince(item) && normalizeCityName(item.Name) !== "Unknown")
+      .forEach((item) => {
+        const id = item.Id || item.id;
+        const name = normalizeCityName(item.Name);
+        const fullName = normalizeCityName(item.FullName);
+        if (!id || !name || !fullName) return;
+        if (seen.has(id)) return;
+        seen.add(id);
+        suggestions.push({ id, name, fullName });
+      });
+
+    suggestions.sort((a, b) => a.name.localeCompare(b.name, "es-AR"));
     res.json(suggestions);
   } catch (err) {
     res.status(502).json({ error: "Climate TRACE API unavailable" });
