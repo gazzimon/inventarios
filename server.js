@@ -278,14 +278,60 @@ function isArgentinaAdminLevel2(item) {
   );
 }
 
-async function fetchAdminSearch({ name, level, limit }) {
+async function fetchAdminSearch({ name, level, limit, bbox }) {
   const url = new URL(`${BASE_URL}/v6/admins/search`);
   const params = new URLSearchParams({ name, limit: String(limit) });
   if (level !== undefined && level !== null) {
     params.set("level", String(level));
   }
+  if (Array.isArray(bbox) && bbox.length === 4) {
+    params.set("bbox", bbox.join(","));
+  }
   url.search = params;
   return fetchJson(url);
+}
+
+async function fetchAdminById(adminId) {
+  const url = new URL(`${BASE_URL}/v6/admins/${adminId}/geojson`);
+  const data = await fetchJson(url);
+  const feature = Array.isArray(data?.features) ? data.features[0] : null;
+  const props = feature?.properties || {};
+  const geometry = feature?.geometry || null;
+  return {
+    id: props.gadm_id || adminId,
+    name: props.name || adminId,
+    fullName: props.full_name || null,
+    country: props.gid0 || "ARG",
+    level: props.level ?? null,
+    gid1: props.gid1 || null,
+    bbox: geometry ? computeBboxFromGeometry(geometry) : null
+  };
+}
+
+function computeBboxFromGeometry(geometry) {
+  const coords = geometry?.coordinates;
+  if (!coords) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  const walk = (value) => {
+    if (!Array.isArray(value)) return;
+    if (typeof value[0] === "number" && typeof value[1] === "number") {
+      const [x, y] = value;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+      return;
+    }
+    value.forEach(walk);
+  };
+
+  walk(coords);
+  if (!Number.isFinite(minX)) return null;
+  return [minX, minY, maxX, maxY];
 }
 
 function mapGasParam(gas) {
@@ -450,7 +496,8 @@ async function searchAdmin(name, level, limit) {
     id: adminId,
     name: adminName,
     level,
-    country: "ARG"
+    country: "ARG",
+    full_name: candidate?.FullName || null
   };
 }
 
@@ -490,14 +537,57 @@ app.get("/api/ipcc/search", async (req, res) => {
   }
 });
 
+app.get("/api/ipcc/departments", async (req, res) => {
+  const province = normalizeCityName(req.query.province);
+  if (province.length < 2) return res.json([]);
+
+  try {
+    const provinceItems = await fetchAdminSearch({ name: province, level: 1, limit: 20 });
+    const provinceCandidate = pickAdminCandidate(provinceItems);
+    const provinceId = provinceCandidate?.Id || provinceCandidate?.id;
+    if (!provinceId) return res.json([]);
+
+    const provinceDetails = await fetchAdminById(provinceId);
+    if (!provinceDetails?.bbox || !provinceDetails?.gid1) return res.json([]);
+
+    const items = await fetchAdminSearch({
+      name: province,
+      level: 2,
+      limit: 300,
+      bbox: provinceDetails.bbox
+    });
+
+    const suggestions = [];
+    const seen = new Set();
+    (Array.isArray(items) ? items : [])
+      .filter((item) => item?.Gid0 === "ARG" && item?.Gid1 === provinceDetails.gid1)
+      .forEach((item) => {
+        const id = item.Id || item.id;
+        const name = normalizeCityName(item.Name);
+        const fullName = normalizeCityName(item.FullName);
+        if (!id || !name || !fullName) return;
+        if (seen.has(id)) return;
+        seen.add(id);
+        suggestions.push({ id, name, fullName });
+      });
+
+    res.json(suggestions);
+  } catch (err) {
+    res.status(502).json({ error: "Climate TRACE API unavailable" });
+  }
+});
+
 app.get("/api/ipcc/inventory", async (req, res) => {
   const level = String(req.query.level || "");
   const name = normalizeCityName(req.query.name);
   const year = Number(req.query.year);
   const gas = mapGasParam(req.query.gas);
   const inventoryMode = String(req.query.inventory_mode || "extended").toLowerCase();
+  const adminIdParam = normalizeCityName(req.query.admin_id);
 
-  if (!name || !level) return res.status(400).json({ error: "Missing parameters" });
+  if ((!name && !adminIdParam) || !level) {
+    return res.status(400).json({ error: "Missing parameters" });
+  }
   if (!Number.isFinite(year)) return res.status(400).json({ error: "Invalid year" });
   if (!["province", "department"].includes(level)) {
     return res.status(400).json({ error: "Invalid level" });
@@ -508,7 +598,31 @@ app.get("/api/ipcc/inventory", async (req, res) => {
 
   try {
     const adminLevel = level === "province" ? 1 : 2;
-    const admin = await searchAdmin(name, adminLevel, 10);
+    let admin = null;
+
+    if (adminIdParam) {
+      try {
+        const adminDetails = await fetchAdminById(adminIdParam);
+        admin = {
+          id: adminDetails.id,
+          name: name || adminDetails.name || adminIdParam,
+          level,
+          country: adminDetails.country || "ARG",
+          full_name: adminDetails.fullName || null
+        };
+      } catch {
+        admin = {
+          id: adminIdParam,
+          name: name || adminIdParam,
+          level,
+          country: "ARG",
+          full_name: null
+        };
+      }
+    } else {
+      admin = await searchAdmin(name, adminLevel, 10);
+    }
+
     const data = await fetchEmissions({ adminId: admin.id, years: String(year), gas });
     const emissions = (data && (data.all || data.All)) || [];
     const { total_ipcc, total_extended, sectors } = aggregateIpcc(emissions);
@@ -537,7 +651,8 @@ app.get("/api/ipcc/inventory", async (req, res) => {
         id: admin.id,
         name: admin.name,
         level,
-        country: admin.country
+        country: admin.country,
+        full_name: admin.full_name || null
       },
       year,
       unit: "tCO2e",

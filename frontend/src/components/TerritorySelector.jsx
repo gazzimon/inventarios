@@ -15,6 +15,8 @@ export default function TerritorySelector({
   setLevel,
   adminName,
   setAdminName,
+  adminId,
+  setAdminId,
   year,
   setYear,
   inventoryMode,
@@ -25,6 +27,8 @@ export default function TerritorySelector({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showList, setShowList] = useState(false)
+  const [provinceFilter, setProvinceFilter] = useState('')
+  const [provinceLoading, setProvinceLoading] = useState(false)
 
   const apiLevel = useMemo(() => {
     return LEVEL_OPTIONS.find((option) => option.value === level)?.apiLevel || 1
@@ -68,6 +72,30 @@ export default function TerritorySelector({
     }
   }, [adminName, apiLevel])
 
+  const loadDepartmentsByProvince = async () => {
+    const query = String(provinceFilter || '').trim()
+    if (query.length < 2) return
+    setProvinceLoading(true)
+    setError('')
+
+    try {
+      const response = await fetch(
+        `/api/ipcc/departments?province=${encodeURIComponent(query)}`
+      )
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error || 'Error al listar departamentos')
+      }
+      setSuggestions(Array.isArray(data) ? data : [])
+      setShowList(true)
+    } catch (err) {
+      setError(err.message || 'Error inesperado')
+      setSuggestions([])
+    } finally {
+      setProvinceLoading(false)
+    }
+  }
+
   return (
     <section className="panel">
       <form
@@ -78,7 +106,7 @@ export default function TerritorySelector({
         }}
       >
         <div className="field">
-          <span>√Åmbito</span>
+          <span>¡mbito</span>
           <div className="segmented">
             {LEVEL_OPTIONS.map((option) => (
               <button
@@ -89,6 +117,7 @@ export default function TerritorySelector({
                   setLevel(option.value)
                   setSuggestions([])
                   setShowList(false)
+                  setAdminId(null)
                 }}
               >
                 {option.label}
@@ -105,16 +134,17 @@ export default function TerritorySelector({
               value={adminName}
               onChange={(event) => {
                 setAdminName(event.target.value)
+                setAdminId(null)
                 setShowList(true)
               }}
               onFocus={() => setShowList(true)}
               onBlur={() => setTimeout(() => setShowList(false), 120)}
-              placeholder={level === 'province' ? 'Misiones' : 'Posadas'}
+              placeholder={level === 'province' ? 'Misiones' : 'Capital'}
               required
             />
             {showList && (
               <div className="suggestions">
-                {loading && <div className="suggestion muted">Buscando‚Ä¶</div>}
+                {loading && <div className="suggestion muted">BuscandoÖ</div>}
                 {error && <div className="suggestion error">{error}</div>}
                 {!loading && !error && suggestions.length === 0 && (
                   <div className="suggestion muted">Sin resultados</div>
@@ -128,6 +158,7 @@ export default function TerritorySelector({
                       key={item.id}
                       onClick={() => {
                         setAdminName(item.name)
+                        setAdminId(item.id)
                         setShowList(false)
                       }}
                     >
@@ -140,8 +171,30 @@ export default function TerritorySelector({
           </div>
         </label>
 
+        {level === 'department' && (
+          <div className="field">
+            <span>Listar por provincia</span>
+            <div className="inline-actions">
+              <input
+                type="text"
+                value={provinceFilter}
+                onChange={(event) => setProvinceFilter(event.target.value)}
+                placeholder="Misiones"
+              />
+              <button
+                type="button"
+                className="secondary"
+                onClick={loadDepartmentsByProvince}
+                disabled={provinceLoading}
+              >
+                {provinceLoading ? 'CargandoÖ' : 'Listar'}
+              </button>
+            </div>
+          </div>
+        )}
+
         <label className="field">
-          <span>A√±o</span>
+          <span>AÒo</span>
           <input
             type="number"
             min="2000"
@@ -168,10 +221,17 @@ export default function TerritorySelector({
           </div>
         </div>
 
-        <button className="primary" type="submit">
+        <button className="primary" type="submit" disabled={!adminId}>
           Consultar inventario
         </button>
+        {!adminId && (
+          <p className="helper">
+            Debes seleccionar una unidad administrativa v√°lida de la lista.
+          </p>
+        )}
       </form>
     </section>
   )
 }
+
+

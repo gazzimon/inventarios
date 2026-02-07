@@ -9,6 +9,7 @@ import TerritorySelector from './components/TerritorySelector.jsx'
 function App() {
   const [level, setLevel] = useState('province')
   const [adminName, setAdminName] = useState('Misiones')
+  const [adminId, setAdminId] = useState(null)
   const [year, setYear] = useState(2022)
   const [inventoryMode, setInventoryMode] = useState('ipcc')
   const [inventory, setInventory] = useState(null)
@@ -33,6 +34,7 @@ function App() {
         year: String(year),
         inventory_mode: inventoryMode
       })
+      if (adminId) params.set('admin_id', adminId)
 
       const response = await fetch(`/api/ipcc/inventory?${params.toString()}`)
       const data = await response.json()
@@ -67,6 +69,7 @@ function App() {
               onClick={() => {
                 setLevel('province')
                 setAdminName('Misiones')
+                setAdminId(null)
                 setInventoryMode('ipcc')
                 setYear(2022)
               }}
@@ -78,6 +81,7 @@ function App() {
               onClick={() => {
                 setLevel('department')
                 setAdminName('Capital')
+                setAdminId(null)
                 setInventoryMode('extended')
                 setYear(2022)
               }}
@@ -93,6 +97,8 @@ function App() {
         setLevel={setLevel}
         adminName={adminName}
         setAdminName={setAdminName}
+        adminId={adminId}
+        setAdminId={setAdminId}
         year={year}
         setYear={setYear}
         inventoryMode={inventoryMode}

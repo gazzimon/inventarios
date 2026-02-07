@@ -225,6 +225,11 @@
   color: #cbd5f5;
 }
 
+.summary-meta-line {
+  color: #cbd5f5;
+  margin-top: 8px;
+}
+
 .summary-meta {
   display: flex;
   flex-direction: column;
@@ -283,6 +288,33 @@
   font: inherit;
   cursor: pointer;
   text-align: left;
+}
+
+.inline-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.inline-actions input {
+  flex: 1;
+}
+
+.secondary {
+  background: #e2e8f0;
+  color: #0f172a;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.helper {
+  grid-column: 1 / -1;
+  color: #b91c1c;
+  font-weight: 600;
+  margin: 0;
 }
 
 .table-row.selectable.active {
