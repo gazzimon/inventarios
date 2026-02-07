@@ -9,9 +9,16 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
+  const [citySuggestions, setCitySuggestions] = useState([])
+  const [cityLoading, setCityLoading] = useState(false)
+  const [cityError, setCityError] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
 
   useEffect(() => {
-    setName(mode === 'province' ? 'Misiones' : 'Posadas')
+    setName(mode === 'province' ? 'Misiones' : 'Capital')
+    setCitySuggestions([])
+    setCityError('')
+    setShowSuggestions(false)
   }, [mode])
 
   const endpoint = useMemo(() => {
@@ -22,6 +29,53 @@ function App() {
     if (value === null || value === undefined || Number.isNaN(value)) return '—'
     return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(value)
   }
+
+  const readJsonResponse = async (response) => {
+    const contentType = response.headers.get('content-type') || ''
+    if (!contentType.includes('application/json')) {
+      const text = await response.text()
+      throw new Error(text ? 'Respuesta no JSON desde el servidor' : 'Respuesta vacia del servidor')
+    }
+    return response.json()
+  }
+
+  useEffect(() => {
+    if (mode !== 'city') return
+    const query = name.trim()
+    if (query.length < 2) {
+      setCitySuggestions([])
+      setCityError('')
+      return
+    }
+
+    const controller = new AbortController()
+    const handle = setTimeout(async () => {
+      setCityLoading(true)
+      setCityError('')
+
+      try {
+        const response = await fetch(`/api/ar/department-search?q=${encodeURIComponent(query)}`, {
+          signal: controller.signal
+        })
+        const data = await readJsonResponse(response)
+        if (!response.ok) {
+          throw new Error(data?.error || 'Error al buscar departamentos')
+        }
+        setCitySuggestions(Array.isArray(data) ? data : [])
+      } catch (err) {
+        if (err.name === 'AbortError') return
+        setCityError(err.message || 'Error inesperado')
+        setCitySuggestions([])
+      } finally {
+        setCityLoading(false)
+      }
+    }, 250)
+
+    return () => {
+      controller.abort()
+      clearTimeout(handle)
+    }
+  }, [mode, name])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -36,7 +90,7 @@ function App() {
       if (gas) params.set('gas', gas)
 
       const response = await fetch(`${endpoint}?${params.toString()}`)
-      const data = await response.json()
+      const data = await readJsonResponse(response)
 
       if (!response.ok) {
         throw new Error(data?.error || 'Error al consultar la API')
@@ -55,9 +109,9 @@ function App() {
       <header className="hero">
         <div>
           <p className="eyebrow">ClimateTrace Argentina</p>
-          <h1>Inventarios de emisiones por provincia y ciudad</h1>
+          <h1>Inventarios de emisiones por provincia y departamento</h1>
           <p className="subtitle">
-            Consulta emisiones agregadas usando la API v6. Selecciona provincia o ciudad,
+            Consulta emisiones agregadas usando la API v6. Selecciona provincia o departamento,
             define los años y recibe el resumen inmediato.
           </p>
         </div>
@@ -67,8 +121,8 @@ function App() {
             <button type="button" onClick={() => { setMode('province'); setName('Misiones') }}>
               Provincia: Misiones
             </button>
-            <button type="button" onClick={() => { setMode('city'); setName('Posadas') }}>
-              Ciudad: Posadas
+            <button type="button" onClick={() => { setMode('city'); setName('Capital') }}>
+              Departamento: Capital
             </button>
           </div>
           <p className="hero-note">Se usa `years=2022` por defecto si no indicas otro año.</p>
@@ -90,19 +144,55 @@ function App() {
               className={mode === 'city' ? 'active' : ''}
               onClick={() => setMode('city')}
             >
-              Ciudad
+              Departamento
             </button>
           </div>
 
           <label className="field">
             <span>Nombre</span>
-            <input
-              type="text"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder={mode === 'province' ? 'Misiones' : 'Posadas'}
-              required
-            />
+            <div className="autocomplete">
+              <input
+                type="text"
+                value={name}
+                onChange={(event) => {
+                  setName(event.target.value)
+                  if (mode === 'city') setShowSuggestions(true)
+                }}
+                onFocus={() => {
+                  if (mode === 'city') setShowSuggestions(true)
+                }}
+                onBlur={() => {
+                  setTimeout(() => setShowSuggestions(false), 120)
+                }}
+                placeholder={mode === 'province' ? 'Misiones' : 'Capital'}
+                required
+              />
+              {mode === 'city' && showSuggestions && (
+                <div className="suggestions">
+                  {cityLoading && <div className="suggestion muted">Buscando…</div>}
+                  {cityError && <div className="suggestion error">{cityError}</div>}
+                  {!cityLoading && !cityError && citySuggestions.length === 0 && (
+                    <div className="suggestion muted">Sin resultados</div>
+                  )}
+                  {!cityLoading &&
+                    !cityError &&
+                    citySuggestions.map((item) => (
+                      <button
+                        type="button"
+                        className="suggestion"
+                        key={item.id}
+                        onClick={() => {
+                          setName(item.name)
+                          setShowSuggestions(false)
+                        }}
+                      >
+                        <span>{item.name}</span>
+                        <small>{item.fullName}</small>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
           </label>
 
           <label className="field">
