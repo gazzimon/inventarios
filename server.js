@@ -280,7 +280,10 @@ function isArgentinaAdminLevel2(item) {
 
 async function fetchAdminSearch({ name, level, limit, bbox }) {
   const url = new URL(`${BASE_URL}/v6/admins/search`);
-  const params = new URLSearchParams({ name, limit: String(limit) });
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (name) {
+    params.set("name", name);
+  }
   if (level !== undefined && level !== null) {
     params.set("level", String(level));
   }
@@ -551,7 +554,7 @@ app.get("/api/ipcc/departments", async (req, res) => {
     if (!provinceDetails?.bbox || !provinceDetails?.gid1) return res.json([]);
 
     const items = await fetchAdminSearch({
-      name: province,
+      name: "",
       level: 2,
       limit: 300,
       bbox: provinceDetails.bbox
@@ -560,7 +563,12 @@ app.get("/api/ipcc/departments", async (req, res) => {
     const suggestions = [];
     const seen = new Set();
     (Array.isArray(items) ? items : [])
-      .filter((item) => item?.Gid0 === "ARG" && item?.Gid1 === provinceDetails.gid1)
+      .filter(
+        (item) =>
+          item?.Gid0 === "ARG" &&
+          item?.Gid1 === provinceDetails.gid1 &&
+          Number(item?.Level) === 2
+      )
       .forEach((item) => {
         const id = item.Id || item.id;
         const name = normalizeCityName(item.Name);
