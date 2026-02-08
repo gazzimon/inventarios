@@ -6,10 +6,16 @@ export default function SubsectorDonut({ sector }) {
   const subsectors = sector?.subsectors || []
   if (!sector || subsectors.length === 0) return null
 
-  const data = subsectors.map((sub, index) => ({
+  const isAfolu = sector.ipcc_code === '3'
+  const operationalSubsectors = isAfolu
+    ? subsectors.filter((sub) => !sub.ipcc_flags?.is_stock_change)
+    : subsectors
+  const operationalTotal = operationalSubsectors.reduce((sum, sub) => sum + (sub.total || 0), 0)
+
+  const data = operationalSubsectors.map((sub, index) => ({
     name: sub.name,
     value: sub.total,
-    share: sub.share,
+    share: operationalTotal > 0 ? sub.total / operationalTotal : 0,
     ipcc: sub.ipcc_code,
     bunker: sub.ipcc_flags?.is_international_bunker,
     color: COLORS[index % COLORS.length]
@@ -35,18 +41,23 @@ export default function SubsectorDonut({ sector }) {
           </PieChart>
         </ResponsiveContainer>
         <div className="subsector-list">
-          {subsectors.map((sub) => (
-            <div key={sub.ipcc_code} className="subsector-row">
-              <div>
-                <p>{sub.name}</p>
-                <small>{sub.ipcc_code}</small>
+          {subsectors.map((sub) => {
+            const isStockChange = Boolean(sub.ipcc_flags?.is_stock_change)
+            const share = operationalTotal > 0 ? (sub.total / operationalTotal) * 100 : 0
+            return (
+              <div key={sub.ipcc_code} className="subsector-row">
+                <div>
+                  <p>{sub.name}</p>
+                  <small>{sub.ipcc_code}</small>
+                </div>
+                <div className="subsector-meta">
+                  {sub.ipcc_flags?.is_international_bunker && <span className="flag">Bunker</span>}
+                  {isStockChange && <span className="flag">Stock change</span>}
+                  <span>{isStockChange ? '-' : `${share.toFixed(1)}%`}</span>
+                </div>
               </div>
-              <div className="subsector-meta">
-                {sub.ipcc_flags?.is_international_bunker && <span className="flag">Bunker</span>}
-                <span>{(sub.share * 100).toFixed(1)}%</span>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>

@@ -147,7 +147,8 @@ function App() {
           </div>
 
           {activeSectorData && (
-            <div className="grid">
+            <>
+              <div className="grid">
               <SubsectorDonut sector={activeSectorData} />
               <div className="table-card">
                 <h3>Subsectores IPCC</h3>
@@ -158,22 +159,41 @@ function App() {
                     <span>Emisiones</span>
                     <span>Share</span>
                   </div>
-                  {activeSectorData.subsectors?.map((sub) => (
-                    <div className="table-row" key={sub.ipcc_code}>
-                      <span>{sub.ipcc_code}</span>
-                      <span>
-                        {sub.name}{' '}
-                        {sub.ipcc_flags?.is_international_bunker && (
-                          <small className="flag">Bunker</small>
-                        )}
-                      </span>
-                      <span>{sub.total.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</span>
-                      <span>{(sub.share * 100).toFixed(1)}%</span>
-                    </div>
-                  ))}
+                  {(() => {
+                    const subsectors = activeSectorData.subsectors || []
+                    const operationalTotal = subsectors
+                      .filter((sub) => !sub.ipcc_flags?.is_stock_change)
+                      .reduce((sum, sub) => sum + (sub.total || 0), 0)
+
+                    return subsectors.map((sub) => {
+                      const isStockChange = Boolean(sub.ipcc_flags?.is_stock_change)
+                      const share = operationalTotal > 0 ? (sub.total / operationalTotal) * 100 : 0
+                      return (
+                        <div className="table-row" key={sub.ipcc_code}>
+                          <span>{sub.ipcc_code}</span>
+                          <span>
+                            {sub.name}{' '}
+                            {sub.ipcc_flags?.is_international_bunker && (
+                              <small className="flag">Bunker</small>
+                            )}
+                            {isStockChange && <small className="flag">Stock change</small>}
+                          </span>
+                          <span>{sub.total.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</span>
+                          <span>{isStockChange ? '-' : `${share.toFixed(1)}%`}</span>
+                        </div>
+                      )
+                    })
+                  })()}
                 </div>
               </div>
             </div>
+            {activeSectorData.ipcc_code === '3' && inventory.total_stock_change !== undefined && (
+              <div className="alert info">
+                Land-use carbon stock change (reported separately):{' '}
+                {Number(inventory.total_stock_change).toLocaleString('es-AR', { maximumFractionDigits: 2 })} tCO2e
+              </div>
+            )}
+            </>
           )}
         </>
       )}
