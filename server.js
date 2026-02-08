@@ -4,9 +4,19 @@ import fetch from "node-fetch";
 const app = express();
 const PORT = 3001;
 
-const BASE_URL = "https://api.climatetrace.org";
+const CT_BASE_URL = process.env.CT_BASE_URL || "https://api.climatetrace.org";
+const CT_INVENTORY_VERSION = process.env.CT_INVENTORY_VERSION || null;
+const GADM_VERSION = process.env.GADM_VERSION || null;
+const BASE_URL = CT_BASE_URL;
 const DEFAULT_YEAR = 2022;
 const DEFAULT_GAS = "co2e_100yr";
+const ALLOWED_GASES = new Set([
+  "co2",
+  "ch4",
+  "n2o",
+  "co2e_100yr",
+  "co2e_20yr"
+]);
 
 const IPCC_SECTORS = {
   "1": "Energy",
@@ -245,7 +255,7 @@ function pickAdminCandidate(items) {
     const gid0 = typeof item?.Gid0 === "string" ? item.Gid0 : "";
     return gid0.toUpperCase() === "ARG" || fullName.includes(", ARG");
   });
-  return byArgentina || items[0];
+  return byArgentina || null;
 }
 
 async function fetchJson(url) {
@@ -566,21 +576,24 @@ async function fetchAssetsByCountry({ country, year, limit, offset }) {
 // Climate TRACE /v6/assets/emissions ignores GADM-style admin IDs (ARG.14_1),
 // so we must aggregate from /v6/assets and spatially filter by admin geometry.
 async function fetchEmissionsByAdminGeometry({ adminGeometry, year, gas }) {
-  const maxPages = 60;
+  const maxPages = Number(process.env.CT_MAX_PAGES || 0);
   const limit = 500;
-  const maxAssets = 50000;
-  const maxMs = 25000;
+  const maxAssets = Number(process.env.CT_MAX_ASSETS || 0);
+  const maxMs = Number(process.env.CT_MAX_MS || 0);
   const start = Date.now();
   const adminBbox = computeBboxFromGeometry(adminGeometry);
 
   const sectorTotals = new Map();
   let processed = 0;
+  let assetsScanned = 0;
+  let assetsInAdmin = 0;
+  let pagesFetched = 0;
   let offset = 0;
 
   let stoppedBy = null;
 
-  for (let page = 0; page < maxPages; page += 1) {
-    if (Date.now() - start > maxMs) {
+  for (let page = 0; maxPages === 0 || page < maxPages; page += 1) {
+    if (maxMs > 0 && Date.now() - start > maxMs) {
       stoppedBy = "timeout";
       break;
     }
@@ -591,10 +604,12 @@ async function fetchEmissionsByAdminGeometry({ adminGeometry, year, gas }) {
       offset
     });
     const assets = Array.isArray(data?.assets) ? data.assets : [];
+    pagesFetched += 1;
+    assetsScanned += assets.length;
     if (assets.length === 0) break;
 
     for (const asset of assets) {
-      if (processed >= maxAssets) {
+      if (maxAssets > 0 && processed >= maxAssets) {
         stoppedBy = "maxAssets";
         break;
       }
@@ -603,27 +618,22 @@ async function fetchEmissionsByAdminGeometry({ adminGeometry, year, gas }) {
       if (!point) continue;
       if (!isPointInGeometry(point, adminGeometry)) continue;
 
+      assetsInAdmin += 1;
       const sector = asset?.Sector || "unknown";
       const emissions = Array.isArray(asset?.EmissionsSummary)
         ? asset.EmissionsSummary
         : [];
       const record = emissions.find((item) => item?.Gas === gas);
-      const value = Number(record?.EmissionsQuantity || 0);
-      if (!Number.isFinite(value) || value <= 0) continue;
+      const value = Number(record?.EmissionsQuantity);
+      if (!Number.isFinite(value)) continue;
 
       sectorTotals.set(sector, (sectorTotals.get(sector) || 0) + value);
       processed += 1;
     }
 
-    if (processed >= maxAssets) break;
+    if (maxAssets > 0 && processed >= maxAssets) break;
     if (assets.length < limit) break;
     offset += limit;
-  }
-
-  if (stoppedBy) {
-    console.warn(
-      `⚠️ Assets aggregation truncated (${stoppedBy}). processed=${processed} year=${year}`
-    );
   }
 
   const emissions = Array.from(sectorTotals.entries()).map(([Sector, Emissions]) => ({
@@ -631,12 +641,25 @@ async function fetchEmissionsByAdminGeometry({ adminGeometry, year, gas }) {
     Emissions
   }));
 
-  return emissions;
+  return {
+    emissions,
+    aggregation: {
+      truncated: Boolean(stoppedBy),
+      stopped_by: stoppedBy,
+      pages_fetched: pagesFetched,
+      assets_scanned: assetsScanned,
+      assets_in_admin: assetsInAdmin,
+      emissions_records: processed,
+      limit
+    }
+  };
 }
 
 function mapGasParam(gas) {
-  if (!gas || gas === "co2e") return DEFAULT_GAS;
-  return String(gas);
+  if (!gas) return DEFAULT_GAS;
+  const normalized = String(gas).trim().toLowerCase();
+  if (normalized === "co2e") return DEFAULT_GAS;
+  return normalized;
 }
 
 function logUnmappedSectors() {
@@ -674,7 +697,7 @@ function mapSectorToIpcc(sectorRaw) {
 
   // Fallback explícito
   return {
-    sectorCode: "X",
+    sectorCode: null,
     subsectorCode: null
   };
 }
@@ -739,7 +762,7 @@ function aggregateIpcc(emissions) {
       totalIpcc += value;
     }
 
-    const subsectorKey = ipcc.code || "X";
+    const subsectorKey = ipcc.code ?? null;
     if (!sector.subsectors.has(subsectorKey)) {
       sector.subsectors.set(subsectorKey, {
         sector_ipcc: ipcc.sector,
@@ -935,6 +958,9 @@ app.get("/api/ipcc/inventory", async (req, res) => {
   if ((!name && !adminIdParam) || !level) {
     return res.status(400).json({ error: "Missing parameters" });
   }
+  if (years.includes(",")) {
+    return res.status(400).json({ error: "Multi-year queries are not supported" });
+  }
   if (!Number.isFinite(year)) return res.status(400).json({ error: "Invalid year" });
   if (!["province", "department"].includes(level)) {
     return res.status(400).json({ error: "Invalid level" });
@@ -942,10 +968,14 @@ app.get("/api/ipcc/inventory", async (req, res) => {
   if (!["ipcc", "extended"].includes(inventoryMode)) {
     return res.status(400).json({ error: "Invalid inventory_mode" });
   }
+  if (!ALLOWED_GASES.has(gas)) {
+    return res.status(400).json({ error: "Invalid gas" });
+  }
 
   try {
     const adminLevel = level === "province" ? 1 : 2;
     let admin = null;
+    UNMAPPED_SECTORS.clear();
 
     if (adminIdParam) {
       try {
@@ -976,7 +1006,7 @@ app.get("/api/ipcc/inventory", async (req, res) => {
       error.status = 502;
       throw error;
     }
-    const emissions = await fetchEmissionsByAdminGeometry({
+    const { emissions, aggregation } = await fetchEmissionsByAdminGeometry({
       adminGeometry: adminGeo.geometry,
       year,
       gas
@@ -1001,6 +1031,21 @@ app.get("/api/ipcc/inventory", async (req, res) => {
     });
 
     logUnmappedSectors();
+    if (aggregation.truncated) {
+      console.warn(
+        `⚠️ Assets aggregation truncated (${aggregation.stopped_by}). ` +
+          `pages=${aggregation.pages_fetched} assets_scanned=${aggregation.assets_scanned} ` +
+          `assets_in_admin=${aggregation.assets_in_admin} emissions_records=${aggregation.emissions_records} ` +
+          `year=${year}`
+      );
+    }
+    console.info(
+      `inventory_request level=${level} admin=${adminGeo.id || admin.id} year=${year} gas=${gas} ` +
+        `mode=${inventoryMode} truncated=${aggregation.truncated}`
+    );
+
+    const gwp =
+      gas === "co2e_100yr" ? "AR6 100yr" : gas === "co2e_20yr" ? "AR6 20yr" : null;
 
     res.json({
       admin: {
@@ -1018,8 +1063,11 @@ app.get("/api/ipcc/inventory", async (req, res) => {
       total_stock_change,
       sectors: outputSectors,
       metadata: {
-        source: "Climate TRACE v6",
-        gwp: "AR6 100yr",
+        source: "Climate TRACE",
+        inventory_version: CT_INVENTORY_VERSION,
+        gadm_version: GADM_VERSION,
+        gas,
+        gwp,
         inventory_mode: inventoryMode,
         totals_available: ["ipcc", "extended"],
         totals_definition: {
@@ -1031,6 +1079,8 @@ app.get("/api/ipcc/inventory", async (req, res) => {
             "Represents one-time carbon stock releases from land-use change (e.g. forest clearing). These emissions are not part of annual operational flows and are therefore excluded from inventory totals and sectoral shares."
         },
         notes: "Land-use carbon stock change emissions are reported separately and excluded from operational totals.",
+        unmapped_sectors: [...UNMAPPED_SECTORS],
+        aggregation,
         generated_at: new Date().toISOString()
       }
     });
