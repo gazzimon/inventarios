@@ -299,6 +299,26 @@ async function fetchEmissions({ adminId, years, gas }) {
   return fetchJson(url);
 }
 
+async function fetchAdminTotalEmissions({ adminId, year, gas }) {
+  const url = new URL(`${BASE_URL}/v6/assets/emissions`);
+  const params = new URLSearchParams({
+    adminId: String(adminId),
+    years: String(year)
+  });
+  if (gas) params.set("gas", String(gas));
+  url.search = params;
+
+  const data = await fetchJson(url);
+  if (!Array.isArray(data)) return 0;
+
+  return data.reduce((sum, row) => {
+    if (gas && row?.Gas && String(row.Gas) !== String(gas)) return sum;
+    const value = Number(row?.Emissions || 0);
+    if (!Number.isFinite(value)) return sum;
+    return sum + value;
+  }, 0);
+}
+
 function normalizeCityName(name) {
   return String(name || "").trim();
 }
@@ -976,7 +996,21 @@ app.get("/api/ipcc/inventory", async (req, res) => {
       gas
     });
     const { total_ipcc, total_extended, total_stock_change, sectors } = aggregateIpcc(emissions);
-    const activeTotal = inventoryMode === "extended" ? total_extended : total_ipcc;
+
+    let officialTotal = null;
+    if (inventoryMode === "ipcc") {
+      officialTotal = await fetchAdminTotalEmissions({
+        adminId: admin.id,
+        year,
+        gas
+      });
+    }
+
+    const activeTotal =
+      inventoryMode === "extended" ? total_extended : (officialTotal ?? total_ipcc);
+    const totalIpccOut = inventoryMode === "ipcc" ? (officialTotal ?? total_ipcc) : total_ipcc;
+    const totalExtendedOut =
+      inventoryMode === "ipcc" ? (officialTotal ?? total_extended) : total_extended;
 
     const outputSectors = sectors.map((sector) => {
       const nextSector = {
@@ -1007,14 +1041,19 @@ app.get("/api/ipcc/inventory", async (req, res) => {
       year,
       unit: "tCO2e",
       total: activeTotal,
-      total_ipcc,
-      total_extended,
+      total_emissions: activeTotal,
+      total_ipcc: totalIpccOut,
+      total_extended: totalExtendedOut,
       total_stock_change,
       sectors: outputSectors,
       metadata: {
-        source: "Climate TRACE v6",
+        source:
+          inventoryMode === "ipcc"
+            ? "Climate TRACE administrative totals"
+            : "Climate TRACE v6",
         gwp: "AR6 100yr",
         inventory_mode: inventoryMode,
+        comparable_with_web: inventoryMode === "ipcc",
         totals_available: ["ipcc", "extended"],
         totals_definition: {
           ipcc: "Excludes international aviation and shipping",
