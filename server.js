@@ -21,6 +21,10 @@ const ARG_PROVINCES_CACHE = {
   ts: 0,
   items: []
 };
+const STOCK_CHANGE_SECTORS = new Set([
+  "forest-land-clearing",
+  "forest-land-degradation"
+]);
 const PROVINCE_ALIAS = {
   "cordoba": "Córdoba",
   "entre rios": "Entre Ríos",
@@ -646,11 +650,13 @@ function resolveIpccFlags(sectorRaw, isResidualCategory = false) {
   const isInternationalBunker =
     value.includes("international-aviation") ||
     value.includes("international-shipping");
+  const isStockChange = STOCK_CHANGE_SECTORS.has(value);
 
   return {
-    included_in_total: !isInternationalBunker,
+    included_in_total: !isInternationalBunker && !isStockChange,
     is_international_bunker: isInternationalBunker,
-    is_residual_category: Boolean(isResidualCategory)
+    is_residual_category: Boolean(isResidualCategory),
+    is_stock_change: isStockChange
   };
 }
 
@@ -723,8 +729,8 @@ function aggregateIpcc(emissions) {
     }
 
     const sector = totals.get(sectorKey);
-    totalExtended += value;
     if (ipccFlags.included_in_total) {
+      totalExtended += value;
       sector.total += value;
       totalIpcc += value;
     }
@@ -1008,6 +1014,7 @@ app.get("/api/ipcc/inventory", async (req, res) => {
           ipcc: "Excludes international aviation and shipping",
           extended: "Includes all observed emissions"
         },
+        notes: "Land-use carbon stock change emissions are reported separately and excluded from operational totals.",
         generated_at: new Date().toISOString()
       }
     });
