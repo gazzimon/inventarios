@@ -99,6 +99,81 @@ const i18n = {
   }
 }
 
+const SUBSECTOR_LABELS = {
+  'Fires and Land Use Change': {
+    es: 'Incendios y cambio de uso del suelo',
+    en: 'Fires and Land Use Change'
+  },
+  'Forest Land Fires': {
+    es: 'Incendios en tierras forestales',
+    en: 'Forest Land Fires'
+  },
+  Cropland: {
+    es: 'Cultivos',
+    en: 'Cropland'
+  },
+  Livestock: {
+    es: 'Ganader?a',
+    en: 'Livestock'
+  },
+  'Enteric Fermentation': {
+    es: 'Fermentaci?n ent?rica',
+    en: 'Enteric Fermentation'
+  },
+  'Other AFOLU': {
+    es: 'Otros AFOLU',
+    en: 'Other AFOLU'
+  },
+  'Domestic Aviation': {
+    es: 'Aviaci?n dom?stica',
+    en: 'Domestic Aviation'
+  },
+  'Domestic Navigation': {
+    es: 'Navegaci?n dom?stica',
+    en: 'Domestic Navigation'
+  },
+  'Road Transportation': {
+    es: 'Transporte por carretera',
+    en: 'Road Transportation'
+  },
+  'Stationary Energy': {
+    es: 'Energ?a estacionaria',
+    en: 'Stationary Energy'
+  },
+  'Electricity Generation': {
+    es: 'Generaci?n el?ctrica',
+    en: 'Electricity Generation'
+  },
+  'Fugitive Emissions': {
+    es: 'Emisiones fugitivas',
+    en: 'Fugitive Emissions'
+  },
+  'Mineral Industry': {
+    es: 'Industria mineral',
+    en: 'Mineral Industry'
+  },
+  'Chemical Industry': {
+    es: 'Industria qu?mica',
+    en: 'Chemical Industry'
+  },
+  'Metal Industry': {
+    es: 'Industria metal?rgica',
+    en: 'Metal Industry'
+  },
+  'Other Manufacturing': {
+    es: 'Otras manufacturas',
+    en: 'Other Manufacturing'
+  },
+  'Solid Waste': {
+    es: 'Residuos s?lidos',
+    en: 'Solid Waste'
+  },
+  Wastewater: {
+    es: 'Aguas residuales',
+    en: 'Wastewater'
+  }
+}
+
 function App() {
   const [provinceId, setProvinceId] = useState(null)
   const [provinceName, setProvinceName] = useState('')
@@ -115,6 +190,10 @@ function App() {
 
   const t = (key) => i18n[lang]?.[key] || key
   const locale = lang === 'es' ? 'es-AR' : 'en-US'
+  const translateSubsector = (name) => {
+    const entry = SUBSECTOR_LABELS[name]
+    return entry ? entry[lang] || name : name
+  }
 
   const activeSectorData = useMemo(() => {
     if (!inventory?.sectors?.length || !activeSector) return null
@@ -235,7 +314,7 @@ function App() {
           {activeSectorData && (
             <>
               <div className="grid">
-                <SubsectorDonut sector={activeSectorData} t={t} locale={locale} />
+                <SubsectorDonut sector={activeSectorData} t={t} locale={locale} translateSubsector={translateSubsector} />
                 <div className="table-card">
                   <h3>{t('subsectorTitle')}</h3>
                   <div className="table">
@@ -258,7 +337,7 @@ function App() {
                           <div className="table-row" key={sub.ipcc_code}>
                             <span>{sub.ipcc_code}</span>
                             <span>
-                              {sub.name}{' '}
+                              {translateSubsector(sub.name)}{' '}
                               {sub.ipcc_flags?.is_international_bunker && (
                                 <small className="flag">{t('bunkerBadge')}</small>
                               )}

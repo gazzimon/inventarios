@@ -2,7 +2,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 
 const COLORS = ['#0f172a', '#38bdf8', '#22c55e', '#facc15', '#fb7185', '#a78bfa']
 
-export default function SubsectorDonut({ sector, t, locale }) {
+export default function SubsectorDonut({ sector, t, locale, translateSubsector }) {
   const subsectors = sector?.subsectors || []
   if (!sector || subsectors.length === 0) return null
 
@@ -13,7 +13,7 @@ export default function SubsectorDonut({ sector, t, locale }) {
   const operationalTotal = operationalSubsectors.reduce((sum, sub) => sum + (sub.total || 0), 0)
 
   const data = operationalSubsectors.map((sub, index) => ({
-    name: sub.name,
+    name: translateSubsector ? translateSubsector(sub.name) : sub.name,
     value: sub.total,
     share: operationalTotal > 0 ? sub.total / operationalTotal : 0,
     ipcc: sub.ipcc_code,
@@ -46,10 +46,11 @@ export default function SubsectorDonut({ sector, t, locale }) {
           {subsectors.map((sub) => {
             const isStockChange = Boolean(sub.ipcc_flags?.is_stock_change)
             const share = operationalTotal > 0 ? (sub.total / operationalTotal) * 100 : 0
+            const label = translateSubsector ? translateSubsector(sub.name) : sub.name
             return (
               <div key={sub.ipcc_code} className="subsector-row">
                 <div>
-                  <p>{sub.name}</p>
+                  <p>{label}</p>
                   <small>{sub.ipcc_code}</small>
                 </div>
                 <div className="subsector-meta">
