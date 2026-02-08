@@ -650,7 +650,7 @@ function resolveIpccFlags(sectorRaw, isResidualCategory = false) {
   const isInternationalBunker =
     value.includes("international-aviation") ||
     value.includes("international-shipping");
-  const isStockChange = STOCK_CHANGE_SECTORS.has(value);
+  const isStockChange = [...STOCK_CHANGE_SECTORS].some((key) => value.includes(key));
 
   return {
     included_in_total: !isInternationalBunker && !isStockChange,
@@ -708,6 +708,7 @@ function aggregateIpcc(emissions) {
   const totals = new Map();
   let totalIpcc = 0;
   let totalExtended = 0;
+  let totalStockChange = 0;
 
   emissions.forEach((item) => {
     const value = Number(item?.Emissions || 0);
@@ -729,6 +730,9 @@ function aggregateIpcc(emissions) {
     }
 
     const sector = totals.get(sectorKey);
+    if (ipccFlags.is_stock_change) {
+      totalStockChange += value;
+    }
     if (ipccFlags.included_in_total) {
       totalExtended += value;
       sector.total += value;
@@ -778,6 +782,7 @@ function aggregateIpcc(emissions) {
   return {
     total_ipcc: totalIpcc,
     total_extended: totalExtended,
+    total_stock_change: totalStockChange,
     sectors
   };
 }
@@ -970,7 +975,7 @@ app.get("/api/ipcc/inventory", async (req, res) => {
       year,
       gas
     });
-    const { total_ipcc, total_extended, sectors } = aggregateIpcc(emissions);
+    const { total_ipcc, total_extended, total_stock_change, sectors } = aggregateIpcc(emissions);
     const activeTotal = inventoryMode === "extended" ? total_extended : total_ipcc;
 
     const outputSectors = sectors.map((sector) => {
@@ -1004,6 +1009,7 @@ app.get("/api/ipcc/inventory", async (req, res) => {
       total: activeTotal,
       total_ipcc,
       total_extended,
+      total_stock_change,
       sectors: outputSectors,
       metadata: {
         source: "Climate TRACE v6",
@@ -1013,6 +1019,10 @@ app.get("/api/ipcc/inventory", async (req, res) => {
         totals_definition: {
           ipcc: "Excludes international aviation and shipping",
           extended: "Includes all observed emissions"
+        },
+        interpretation_notes: {
+          total_stock_change:
+            "Represents one-time carbon stock releases from land-use change (e.g. forest clearing). These emissions are not part of annual operational flows and are therefore excluded from inventory totals and sectoral shares."
         },
         notes: "Land-use carbon stock change emissions are reported separately and excluded from operational totals.",
         generated_at: new Date().toISOString()
