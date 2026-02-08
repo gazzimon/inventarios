@@ -9,9 +9,9 @@ import TerritorySelector from './components/TerritorySelector.jsx'
 const i18n = {
   es: {
     appEyebrow: 'ClimateTrace Argentina',
-    appTitle: 'Dashboard IPCC de inventarios subnacionales',
+    appTitle: 'Cuadro IPCC de emisiones subnacionales',
     appSubtitle:
-      'Visualiza inventarios por provincia o municipio/departamento con totales oficiales IPCC y modo ampliado para an?lisis completo.',
+      'Visualización de emisiones estimadas por provincia o municipio/departamento, alineadas a categorías IPCC y datos Climate TRACE.',
     langEs: 'ES',
     langEn: 'EN',
     queryLabel: 'Consulta',
@@ -19,7 +19,7 @@ const i18n = {
     errorGeneric: 'Error inesperado',
     stockChangeInfo: 'Cambio de stock de carbono (reportado por separado):',
     subsectorTitle: 'Subsectores IPCC',
-    tableCode: 'C?digo',
+    tableCode: 'Código',
     tableName: 'Nombre',
     tableEmissions: 'Emisiones',
     tableShare: 'Share',
@@ -27,25 +27,25 @@ const i18n = {
     stockBadge: 'Cambio de stock',
     unit_tco2e: 'tCO2e',
     summaryTotal: 'Total emisiones',
-    summaryModeIpcc: 'Inventario IPCC (excluye aviaci?n y navegaci?n internacional)',
+    summaryModeIpcc: 'Inventario IPCC (excluye aviación y navegación internacional)',
     summaryModeExtended: 'Inventario ampliado (incluye todas las emisiones)',
-    summaryYear: 'A?o',
+    summaryYear: 'Año',
     summaryMode: 'Modo',
     summaryId: 'ID',
     sectorDonutTitle: 'Emisiones por sector IPCC',
     sectorDonutHint: 'Haz clic en un sector para ver el detalle.',
     sectorTableTitle: 'Totales por sector',
     sectorTableSector: 'Sector',
-    sectorTableCode: 'C?digo IPCC',
+    sectorTableCode: 'Código IPCC',
     sectorTableEmissions: 'Emisiones (tCO2e)',
     sectorTablePercent: 'Porcentaje',
     detailPrefix: 'Detalle:',
-    tooltipShare: 'Participaci?n',
+    tooltipShare: 'Participación',
     provinceLabel: 'Provincia',
     provincePlaceholder: 'Seleccionar provincia',
     departmentLabel: 'Departamento (opcional)',
     departmentPlaceholder: 'Total provincial',
-    yearLabel: 'A?o',
+    yearLabel: 'Año',
     inventoryModeLabel: 'Modo de inventario',
     inventoryIpcc: 'Inventario IPCC',
     inventoryExtended: 'Inventario ampliado',
@@ -54,9 +54,9 @@ const i18n = {
   },
   en: {
     appEyebrow: 'ClimateTrace Argentina',
-    appTitle: 'IPCC Subnational Inventories Dashboard',
+    appTitle: 'IPCC-aligned Subnational Emissions Dashboard',
     appSubtitle:
-      'Explore inventories by province or municipality/department with official IPCC totals and extended mode for full analysis.',
+      'Visualization of estimated emissions by province or municipality/department, aligned with IPCC categories and Climate TRACE data.',
     langEs: 'ES',
     langEn: 'EN',
     queryLabel: 'Query',
@@ -99,6 +99,7 @@ const i18n = {
   }
 }
 
+
 const SUBSECTOR_LABELS = {
   'Fires and Land Use Change': {
     es: 'Incendios y cambio de uso del suelo',
@@ -113,11 +114,11 @@ const SUBSECTOR_LABELS = {
     en: 'Cropland'
   },
   Livestock: {
-    es: 'Ganader?a',
+    es: 'Ganadería',
     en: 'Livestock'
   },
   'Enteric Fermentation': {
-    es: 'Fermentaci?n ent?rica',
+    es: 'Fermentación entérica',
     en: 'Enteric Fermentation'
   },
   'Other AFOLU': {
@@ -125,11 +126,11 @@ const SUBSECTOR_LABELS = {
     en: 'Other AFOLU'
   },
   'Domestic Aviation': {
-    es: 'Aviaci?n dom?stica',
+    es: 'Aviación doméstica',
     en: 'Domestic Aviation'
   },
   'Domestic Navigation': {
-    es: 'Navegaci?n dom?stica',
+    es: 'Navegación doméstica',
     en: 'Domestic Navigation'
   },
   'Road Transportation': {
@@ -137,11 +138,11 @@ const SUBSECTOR_LABELS = {
     en: 'Road Transportation'
   },
   'Stationary Energy': {
-    es: 'Energ?a estacionaria',
+    es: 'Energía estacionaria',
     en: 'Stationary Energy'
   },
   'Electricity Generation': {
-    es: 'Generaci?n el?ctrica',
+    es: 'Generación eléctrica',
     en: 'Electricity Generation'
   },
   'Fugitive Emissions': {
@@ -153,11 +154,11 @@ const SUBSECTOR_LABELS = {
     en: 'Mineral Industry'
   },
   'Chemical Industry': {
-    es: 'Industria qu?mica',
+    es: 'Industria química',
     en: 'Chemical Industry'
   },
   'Metal Industry': {
-    es: 'Industria metal?rgica',
+    es: 'Industria metalúrgica',
     en: 'Metal Industry'
   },
   'Other Manufacturing': {
@@ -165,7 +166,7 @@ const SUBSECTOR_LABELS = {
     en: 'Other Manufacturing'
   },
   'Solid Waste': {
-    es: 'Residuos s?lidos',
+    es: 'Residuos sólidos',
     en: 'Solid Waste'
   },
   Wastewater: {
@@ -173,6 +174,7 @@ const SUBSECTOR_LABELS = {
     en: 'Wastewater'
   }
 }
+
 
 function App() {
   const [provinceId, setProvinceId] = useState(null)
