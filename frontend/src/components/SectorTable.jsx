@@ -1,15 +1,15 @@
-export default function SectorTable({ sectors, onSelect, activeCode }) {
+export default function SectorTable({ sectors, onSelect, activeCode, t, locale }) {
   if (!sectors || sectors.length === 0) return null
 
   return (
     <div className="table-card">
-      <h3>Totales por sector</h3>
+      <h3>{t('sectorTableTitle')}</h3>
       <div className="table">
         <div className="table-row table-head">
-          <span>Sector</span>
-          <span>Código IPCC</span>
-          <span>Emisiones (tCO₂e)</span>
-          <span>Porcentaje</span>
+          <span>{t('sectorTableSector')}</span>
+          <span>{t('sectorTableCode')}</span>
+          <span>{t('sectorTableEmissions')}</span>
+          <span>{t('sectorTablePercent')}</span>
         </div>
         {sectors.map((sector) => (
           <button
@@ -20,7 +20,7 @@ export default function SectorTable({ sectors, onSelect, activeCode }) {
           >
             <span>{sector.name}</span>
             <span>{sector.ipcc_code}</span>
-            <span>{sector.total.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</span>
+            <span>{sector.total.toLocaleString(locale, { maximumFractionDigits: 2 })}</span>
             <span>{(sector.share * 100).toFixed(1)}%</span>
           </button>
         ))}

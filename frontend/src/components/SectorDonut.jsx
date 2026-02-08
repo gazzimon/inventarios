@@ -2,7 +2,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 
 const COLORS = ['#111827', '#2563eb', '#10b981', '#f97316', '#8b5cf6', '#f43f5e']
 
-export default function SectorDonut({ sectors, onSelect, activeCode }) {
+export default function SectorDonut({ sectors, onSelect, activeCode, t, locale }) {
   if (!sectors || sectors.length === 0) return null
 
   const data = sectors.map((sector, index) => ({
@@ -15,7 +15,7 @@ export default function SectorDonut({ sectors, onSelect, activeCode }) {
 
   return (
     <div className="chart-card">
-      <h3>Emisiones por sector IPCC</h3>
+      <h3>{t('sectorDonutTitle')}</h3>
       <div className="chart-body">
         <ResponsiveContainer width="100%" height={280}>
           <PieChart>
@@ -37,13 +37,13 @@ export default function SectorDonut({ sectors, onSelect, activeCode }) {
             </Pie>
             <Tooltip
               formatter={(value, name, props) => [
-                `${Number(value).toLocaleString('es-AR', { maximumFractionDigits: 2 })} tCO₂e`,
-                `${name} (${(props.payload.share * 100).toFixed(1)}%)`
+                `${Number(value).toLocaleString(locale, { maximumFractionDigits: 2 })} ${t('unit_tco2e')}`,
+                `${name} ? ${t('tooltipShare')} ${(props.payload.share * 100).toFixed(1)}%`
               ]}
             />
           </PieChart>
         </ResponsiveContainer>
-        <p className="chart-hint">Haz click en un sector para ver el detalle.</p>
+        <p className="chart-hint">{t('sectorDonutHint')}</p>
       </div>
     </div>
   )

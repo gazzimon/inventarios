@@ -1,10 +1,5 @@
 import { useEffect, useState } from 'react'
 
-const INVENTORY_OPTIONS = [
-  { value: 'ipcc', label: 'Inventario IPCC' },
-  { value: 'extended', label: 'Inventario ampliado' }
-]
-
 export default function TerritorySelector({
   provinceId,
   setProvinceId,
@@ -18,12 +13,18 @@ export default function TerritorySelector({
   setYear,
   inventoryMode,
   setInventoryMode,
-  onSubmit
+  onSubmit,
+  t
 }) {
   const [provinces, setProvinces] = useState([])
   const [departments, setDepartments] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const inventoryOptions = [
+    { value: 'ipcc', label: t('inventoryIpcc') },
+    { value: 'extended', label: t('inventoryExtended') }
+  ]
 
   useEffect(() => {
     let active = true
@@ -31,19 +32,19 @@ export default function TerritorySelector({
       try {
         const response = await fetch('/api/ipcc/provinces')
         const data = await response.json()
-        if (!response.ok) throw new Error(data?.error || 'Error al cargar provincias')
+        if (!response.ok) throw new Error(data?.error || t('errorGeneric'))
         if (active) {
           setProvinces(Array.isArray(data) ? data : [])
         }
       } catch (err) {
-        if (active) setError(err.message || 'Error inesperado')
+        if (active) setError(err.message || t('errorGeneric'))
       }
     }
     load()
     return () => {
       active = false
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     if (!provinceName) {
@@ -59,12 +60,12 @@ export default function TerritorySelector({
           `/api/ipcc/departments?province=${encodeURIComponent(provinceName)}`
         )
         const data = await response.json()
-        if (!response.ok) throw new Error(data?.error || 'Error al cargar departamentos')
+        if (!response.ok) throw new Error(data?.error || t('errorGeneric'))
         if (active) {
           setDepartments(Array.isArray(data) ? data : [])
         }
       } catch (err) {
-        if (active) setError(err.message || 'Error inesperado')
+        if (active) setError(err.message || t('errorGeneric'))
       } finally {
         if (active) setLoading(false)
       }
@@ -73,7 +74,7 @@ export default function TerritorySelector({
     return () => {
       active = false
     }
-  }, [provinceName])
+  }, [provinceName, t])
 
   return (
     <section className="panel">
@@ -85,7 +86,7 @@ export default function TerritorySelector({
         }}
       >
         <label className="field">
-          <span>Provincia</span>
+          <span>{t('provinceLabel')}</span>
           <select
             value={provinceId || ''}
             onChange={(event) => {
@@ -98,7 +99,7 @@ export default function TerritorySelector({
             }}
             required
           >
-            <option value="">Seleccionar provincia</option>
+            <option value="">{t('provincePlaceholder')}</option>
             {provinces.map((province) => (
               <option key={province.id} value={province.id}>
                 {province.name}
@@ -108,7 +109,7 @@ export default function TerritorySelector({
         </label>
 
         <label className="field">
-          <span>Departamento (opcional)</span>
+          <span>{t('departmentLabel')}</span>
           <select
             value={departmentId || ''}
             onChange={(event) => {
@@ -118,7 +119,7 @@ export default function TerritorySelector({
               setDepartmentName(selected?.name || '')
             }}
           >
-            <option value="">Total provincial</option>
+            <option value="">{t('departmentPlaceholder')}</option>
             {departments.map((department) => (
               <option key={department.id} value={department.id}>
                 {department.name}
@@ -128,7 +129,7 @@ export default function TerritorySelector({
         </label>
 
         <label className="field">
-          <span>Año</span>
+          <span>{t('yearLabel')}</span>
           <input
             type="number"
             min="2000"
@@ -140,9 +141,9 @@ export default function TerritorySelector({
         </label>
 
         <div className="field">
-          <span>Modo de inventario</span>
+          <span>{t('inventoryModeLabel')}</span>
           <div className="segmented">
-            {INVENTORY_OPTIONS.map((option) => (
+            {inventoryOptions.map((option) => (
               <button
                 key={option.value}
                 type="button"
@@ -158,7 +159,7 @@ export default function TerritorySelector({
         {error && <p className="helper">{error}</p>}
 
         <button className="primary" type="submit" disabled={!provinceId || loading}>
-          {loading ? 'Cargando…' : 'Consultar inventario'}
+          {loading ? t('loading') : t('submit')}
         </button>
       </form>
     </section>
