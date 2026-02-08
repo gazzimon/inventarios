@@ -76,7 +76,7 @@ const IPCC_METADATA = {
 
 const IPCC_SUBSECTORS = {
   "1A": "Stationary Energy",
-  "1B": "Transport",
+  "1A3": "Transport",
   "1C": "Fugitive Emissions",
   "2A": "Mineral Industry",
   "2B": "Chemical Industry",
@@ -153,12 +153,12 @@ const IPCC_MAPPING = [
   { match: "oil-and-gas-refining", sector: "1", subsector: "1A" },
 
   // 1A3 – Transport
-  { match: "road-transportation", sector: "1", subsector: "1B" },
-  { match: "rail", sector: "1", subsector: "1B" },
-  { match: "domestic-aviation", sector: "1", subsector: "1B" },
-  { match: "domestic-shipping", sector: "1", subsector: "1B" },
-  { match: "international-aviation", sector: "1", subsector: "1B" },
-  { match: "international-shipping", sector: "1", subsector: "1B" },
+  { match: "road-transportation", sector: "1", subsector: "1A3" },
+  { match: "rail", sector: "1", subsector: "1A3" },
+  { match: "domestic-aviation", sector: "1", subsector: "1A3" },
+  { match: "domestic-shipping", sector: "1", subsector: "1A3" },
+  { match: "international-aviation", sector: "1", subsector: "1A3" },
+  { match: "international-shipping", sector: "1", subsector: "1A3" },
   { match: "other-energy-use", sector: "1", subsector: "1A" },
 
   // 1B – Fugitive emissions
@@ -789,7 +789,11 @@ function aggregateIpcc(emissions) {
 
 async function searchAdmin(name, level, limit) {
   const items = await fetchAdminSearch({ name, level, limit });
-  const candidate = pickAdminCandidate(items);
+  const candidate = (Array.isArray(items) ? items : []).find((item) => {
+    const fullName = typeof item?.FullName === "string" ? item.FullName : "";
+    const gid0 = typeof item?.Gid0 === "string" ? item.Gid0 : "";
+    return gid0.toUpperCase() === "ARG" || fullName.includes(", ARG");
+  });
 
   const adminId = candidate?.Id || candidate?.id;
   const adminName = candidate?.Name || candidate?.name || name;
@@ -807,6 +811,7 @@ async function searchAdmin(name, level, limit) {
     full_name: candidate?.FullName || null
   };
 }
+
 
 app.get("/api/ipcc/search", async (req, res) => {
   const q = normalizeCityName(req.query.q);
@@ -921,7 +926,8 @@ app.get("/api/ipcc/provinces", async (req, res) => {
 app.get("/api/ipcc/inventory", async (req, res) => {
   const level = String(req.query.level || "");
   const name = normalizeCityName(req.query.name);
-  const year = Number(req.query.year);
+  const years = resolveYears(req.query);
+  const year = Number(years);
   const gas = mapGasParam(req.query.gas);
   const inventoryMode = String(req.query.inventory_mode || "extended").toLowerCase();
   const adminIdParam = normalizeCityName(req.query.admin_id);
