@@ -73,37 +73,6 @@ function App() {
             IPCC y modo ampliado para análisis completo.
           </p>
         </div>
-        <div className="hero-card">
-          <p className="hero-label">Consulta rápida</p>
-          <div className="quick-actions">
-            <button
-              type="button"
-              onClick={() => {
-                setProvinceName('Misiones')
-                setProvinceId('ARG.14_1')
-                setDepartmentId(null)
-                setDepartmentName('')
-                setInventoryMode('ipcc')
-                setYear(2022)
-              }}
-            >
-              Misiones · IPCC 2022
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setProvinceName('Misiones')
-                setProvinceId('ARG.14_1')
-                setDepartmentId('ARG.14.4_1')
-                setDepartmentName('Capital')
-                setInventoryMode('extended')
-                setYear(2022)
-              }}
-            >
-              Capital (Misiones) · Ampliado 2022
-            </button>
-          </div>
-        </div>
       </header>
 
       <TerritorySelector
