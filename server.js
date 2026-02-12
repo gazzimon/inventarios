@@ -1141,6 +1141,29 @@ app.get("/api/ar/province-inventory", async (req, res) => {
   }
 });
 
+app.get("/api/debug/sector-coverage", async (req, res) => {
+  const year = Number(req.query.year || 2024);
+  const gas = "co2e_100yr";
+
+  const data = await fetchAssetsByCountry({
+    country: "ARG",
+    year,
+    limit: 500,
+    offset: 0
+  });
+
+  const sectors = new Set(
+    data.assets.map(a => a.Sector?.toLowerCase())
+  );
+
+  res.json({
+    year,
+    climate_trace_sectors: [...sectors].sort(),
+    mapped: [...sectors].filter(s => !UNMAPPED_SECTORS.has(s)),
+    unmapped: [...UNMAPPED_SECTORS]
+  });
+});
+
 app.get("/api/ar/city-inventory", async (req, res) => {
   const name = req.query.name ? String(req.query.name) : "Posadas";
   const years = resolveYears(req.query);

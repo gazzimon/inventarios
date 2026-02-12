@@ -1,4 +1,4 @@
-# ClimateTrace - Subnational Inventory API (Argentina)
+﻿# ClimateTrace - Subnational Inventory API (Argentina)
 
 Node.js + React project to generate subnational inventories (provinces and departments) from Climate TRACE data, with IPCC-oriented aggregation and audit metadata.
 
